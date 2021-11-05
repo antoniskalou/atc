@@ -1,16 +1,13 @@
 use ggez::{
-    Context, ContextBuilder, GameResult,
+    event::{self, EventHandler, KeyCode, MouseButton},
     graphics::{self, Color},
-    event::{self, EventHandler, KeyCode},
-    input, 
-    timer,
+    timer, Context, ContextBuilder, GameResult,
 };
 
 type Point = ggez::mint::Point2<f32>;
 
 fn is_point_in_circle(point: Point, circle_pos: Point, circle_radius: f32) -> bool {
-    point.x - circle_pos.x < circle_radius &&
-        point.y - circle_pos.y < circle_radius
+    point.x - circle_pos.x < circle_radius && point.y - circle_pos.y < circle_radius
 }
 
 fn main() {
@@ -42,11 +39,11 @@ const AIRCRAFT_RADIUS: f32 = 10.0;
 impl Aircraft {
     pub fn change_heading(&mut self, new_course: i32) {
         self.heading = if new_course < 0 {
-            360 
+            360
         } else if new_course > 360 {
             0
-        } else { 
-            new_course 
+        } else {
+            new_course
         };
     }
 
@@ -88,16 +85,18 @@ struct Game {
 
 impl Game {
     pub fn new(_ctx: &mut Context) -> Self {
-        let runway_29 = Runway { heading: 290, length: 3000, width: 100, };
+        let runway_29 = Runway {
+            heading: 290,
+            length: 3000,
+            width: 100,
+        };
 
         Self {
-            airports: vec![
-                Airport {
-                    icao_code: "LCPH".into(),
-                    takeoff_runways: vec![runway_29.clone()],
-                    landing_runways: vec![runway_29.clone()],
-                }
-            ],
+            airports: vec![Airport {
+                icao_code: "LCPH".into(),
+                takeoff_runways: vec![runway_29.clone()],
+                landing_runways: vec![runway_29.clone()],
+            }],
             selected_aircraft: 0,
             aircraft: vec![
                 Aircraft {
@@ -117,8 +116,8 @@ impl Game {
                     speed: 220,
                     on_loc: false,
                     on_ils: false,
-                }
-            ]
+                },
+            ],
         }
     }
 }
@@ -126,33 +125,6 @@ impl Game {
 impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         let dt = timer::delta(ctx);
-
-        let aircraft = &mut self.aircraft[self.selected_aircraft];
-        if input::keyboard::is_key_pressed(ctx, KeyCode::A) {
-            aircraft.change_heading(aircraft.heading - 5);
-        } else if input::keyboard::is_key_pressed(ctx, KeyCode::D) {
-            aircraft.change_heading(aircraft.heading + 5);
-        } else if input::keyboard::is_key_pressed(ctx, KeyCode::S) {
-            aircraft.change_altitude(aircraft.altitude - 1000);
-        } else if input::keyboard::is_key_pressed(ctx, KeyCode::W) {
-            aircraft.change_altitude(aircraft.altitude + 1000);
-        } else if input::keyboard::is_key_pressed(ctx, KeyCode::F) {
-            aircraft.change_speed(aircraft.speed - 10);
-        } else if input::keyboard::is_key_pressed(ctx, KeyCode::R) {
-            aircraft.change_speed(aircraft.speed + 10);
-        }
-
-        // aircraft selection
-        if input::mouse::button_pressed(ctx, event::MouseButton::Left) {
-            let click_pos = input::mouse::position(ctx);
-
-            for (i, aircraft) in self.aircraft.iter().enumerate() {
-                if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_RADIUS) {
-                    self.selected_aircraft = i;
-                    break;
-                }
-            }
-        }
 
         for mut aircraft in &mut self.aircraft {
             let speed_scale = 25.0;
@@ -166,6 +138,44 @@ impl EventHandler<ggez::GameError> for Game {
         Ok(())
     }
 
+    fn key_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        keycode: KeyCode,
+        _keymod: event::KeyMods,
+        _repeat: bool,
+    ) {
+        let aircraft = &mut self.aircraft[self.selected_aircraft];
+
+        if keycode == KeyCode::A {
+            aircraft.change_heading(aircraft.heading - 5);
+        } else if keycode == KeyCode::D {
+            aircraft.change_heading(aircraft.heading + 5);
+        } else if keycode == KeyCode::S {
+            aircraft.change_altitude(aircraft.altitude - 1000);
+        } else if keycode == KeyCode::W {
+            aircraft.change_altitude(aircraft.altitude + 1000);
+        } else if keycode == KeyCode::F {
+            aircraft.change_speed(aircraft.speed - 10);
+        } else if keycode == KeyCode::R {
+            aircraft.change_speed(aircraft.speed + 10);
+        }
+    }
+
+    fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, x: f32, y: f32) {
+        // aircraft selection
+        if button == MouseButton::Left {
+            let click_pos = Point { x, y };
+
+            for (i, aircraft) in self.aircraft.iter().enumerate() {
+                if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_RADIUS) {
+                    self.selected_aircraft = i;
+                    break;
+                }
+            }
+        }
+    }
+
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, Color::BLACK);
 
@@ -173,19 +183,22 @@ impl EventHandler<ggez::GameError> for Game {
             let icao_text = graphics::Text::new(airport.icao_code.clone());
             graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
             graphics::draw_queued_text(
-                ctx, 
-                graphics::DrawParam::new(), 
-                None, 
-                graphics::FilterMode::Linear
+                ctx,
+                graphics::DrawParam::new(),
+                None,
+                graphics::FilterMode::Linear,
             )?;
 
             for runway in &airport.landing_runways {
                 let length_scale = 10.0;
                 let rectangle = graphics::Mesh::new_rectangle(
-                    ctx, 
-                    graphics::DrawMode::fill(), 
+                    ctx,
+                    graphics::DrawMode::fill(),
                     graphics::Rect::new(
-                        200.0, 200.0, runway.width as f32 / length_scale, runway.length as f32 / length_scale,
+                        200.0,
+                        200.0,
+                        runway.width as f32 / length_scale,
+                        runway.length as f32 / length_scale,
                     ),
                     Color::BLUE,
                 )?;
@@ -198,38 +211,61 @@ impl EventHandler<ggez::GameError> for Game {
             let circle = graphics::Mesh::new_circle(
                 ctx,
                 graphics::DrawMode::stroke(2.0),
-                aircraft.position, 
-                AIRCRAFT_RADIUS, 
-                1.0, 
+                aircraft.position,
+                AIRCRAFT_RADIUS,
+                1.0,
                 Color::GREEN,
             )?;
 
             graphics::draw(ctx, &circle, (Point { x: 0.0, y: 0.0 },))?;
 
             let callsign_text = graphics::Text::new(aircraft.callsign.clone());
-            graphics::queue_text(ctx, &callsign_text, Point { x: -20.0, y: 10.0, }, Some(Color::GREEN));
+            graphics::queue_text(
+                ctx,
+                &callsign_text,
+                Point { x: -20.0, y: 10.0 },
+                Some(Color::GREEN),
+            );
             let heading_text = graphics::Text::new(format!("H{}", aircraft.heading));
-            graphics::queue_text(ctx, &heading_text, Point { x: -20.0, y: 25.0, }, Some(Color::GREEN));
+            graphics::queue_text(
+                ctx,
+                &heading_text,
+                Point { x: -20.0, y: 25.0 },
+                Some(Color::GREEN),
+            );
             let altitude_text = graphics::Text::new(format!("{}", aircraft.altitude));
-            graphics::queue_text(ctx, &altitude_text, Point { x: 20.0, y: 25.0, }, Some(Color::GREEN));
+            graphics::queue_text(
+                ctx,
+                &altitude_text,
+                Point { x: 20.0, y: 25.0 },
+                Some(Color::GREEN),
+            );
 
             graphics::draw_queued_text(
-                ctx, 
+                ctx,
                 graphics::DrawParam::new().dest(aircraft.position),
                 None,
                 graphics::FilterMode::Linear,
             )?;
         }
 
-        let selected_aircraft_text = graphics::Text::new(
-            format!("SELECTED: {}", self.aircraft[self.selected_aircraft as usize].callsign.clone())
+        let selected_aircraft_text = graphics::Text::new(format!(
+            "SELECTED: {}",
+            self.aircraft[self.selected_aircraft as usize]
+                .callsign
+                .clone()
+        ));
+        graphics::queue_text(
+            ctx,
+            &selected_aircraft_text,
+            Point { x: 0.0, y: 0.0 },
+            Some(Color::WHITE),
         );
-        graphics::queue_text(ctx, &selected_aircraft_text, Point { x: 0.0, y: 0.0 }, Some(Color::WHITE));
         graphics::draw_queued_text(
-            ctx, 
-            graphics::DrawParam::new(), 
-            None, 
-            graphics::FilterMode::Linear
+            ctx,
+            graphics::DrawParam::new(),
+            None,
+            graphics::FilterMode::Linear,
         )?;
 
         graphics::present(ctx)
