@@ -8,6 +8,11 @@ use ggez::{
 
 type Point = ggez::mint::Point2<f32>;
 
+fn is_point_in_circle(point: Point, circle_pos: Point, circle_radius: f32) -> bool {
+    point.x - circle_pos.x < circle_radius &&
+        point.y - circle_pos.y < circle_radius
+}
+
 fn main() {
     let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
         .build()
@@ -31,6 +36,8 @@ struct Aircraft {
     on_loc: bool,
     on_ils: bool,
 }
+
+const AIRCRAFT_RADIUS: f32 = 10.0;
 
 impl Aircraft {
     pub fn change_heading(&mut self, new_course: i32) {
@@ -75,7 +82,7 @@ struct Airport {
 #[derive(Clone, Debug)]
 struct Game {
     airports: Vec<Airport>,
-    selected_aircraft: i32,
+    selected_aircraft: usize,
     aircraft: Vec<Aircraft>,
 }
 
@@ -120,7 +127,7 @@ impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         let dt = timer::delta(ctx);
 
-        let aircraft = &mut self.aircraft[self.selected_aircraft as usize];
+        let aircraft = &mut self.aircraft[self.selected_aircraft];
         if input::keyboard::is_key_pressed(ctx, KeyCode::A) {
             aircraft.change_heading(aircraft.heading - 5);
         } else if input::keyboard::is_key_pressed(ctx, KeyCode::D) {
@@ -133,12 +140,18 @@ impl EventHandler<ggez::GameError> for Game {
             aircraft.change_speed(aircraft.speed - 10);
         } else if input::keyboard::is_key_pressed(ctx, KeyCode::R) {
             aircraft.change_speed(aircraft.speed + 10);
-        } else if input::keyboard::is_key_pressed(ctx, KeyCode::RBracket) {
-            self.selected_aircraft = (self.selected_aircraft + 1).min(self.aircraft.len() as i32 - 1);
-            println!("{}", self.selected_aircraft);
-        } else if input::keyboard::is_key_pressed(ctx, KeyCode::LBracket) {
-            self.selected_aircraft = (self.selected_aircraft - 1).max(0);
-            println!("{}", self.selected_aircraft);
+        }
+
+        // aircraft selection
+        if input::mouse::button_pressed(ctx, event::MouseButton::Left) {
+            let click_pos = input::mouse::position(ctx);
+
+            for (i, aircraft) in self.aircraft.iter().enumerate() {
+                if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_RADIUS) {
+                    self.selected_aircraft = i;
+                    break;
+                }
+            }
         }
 
         for mut aircraft in &mut self.aircraft {
@@ -186,7 +199,7 @@ impl EventHandler<ggez::GameError> for Game {
                 ctx,
                 graphics::DrawMode::stroke(2.0),
                 aircraft.position, 
-                10.0, 
+                AIRCRAFT_RADIUS, 
                 1.0, 
                 Color::GREEN,
             )?;
