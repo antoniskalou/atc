@@ -7,7 +7,15 @@ use ggez::{
 type Point = ggez::mint::Point2<f32>;
 
 fn is_point_in_circle(point: Point, circle_pos: Point, circle_radius: f32) -> bool {
-    point.x - circle_pos.x < circle_radius && point.y - circle_pos.y < circle_radius
+    (point.x - circle_pos.x).powi(2) + (point.y - circle_pos.y).powi(2) < circle_radius.powi(2)
+}
+
+fn heading_to_vector(heading: i32) -> Point {
+    let heading = (heading as f32 - 90.0).to_radians();
+    Point {
+        x: heading.cos(),
+        y: heading.sin(),
+    }
 }
 
 fn main() {
@@ -60,7 +68,7 @@ impl Aircraft {
 #[derive(Clone, Debug)]
 struct Runway {
     /// Offset from airport
-    // position: Point,
+    // offset: Point,
     heading: u32,
     /// length in meters
     length: u32,
@@ -129,10 +137,10 @@ impl EventHandler<ggez::GameError> for Game {
         for mut aircraft in &mut self.aircraft {
             let speed_scale = 25.0;
             let speed_change = (aircraft.speed as f32 * dt.as_secs_f32()) / speed_scale;
-            // TODO: bearing to vector
-            let heading = (aircraft.heading as f32 - 90.0).to_radians();
-            aircraft.position.x += speed_change * heading.cos();
-            aircraft.position.y += speed_change * heading.sin();
+
+            let heading = heading_to_vector(aircraft.heading);
+            aircraft.position.x += speed_change * heading.x;
+            aircraft.position.y += speed_change * heading.y;
         }
 
         Ok(())
@@ -159,6 +167,10 @@ impl EventHandler<ggez::GameError> for Game {
             aircraft.change_speed(aircraft.speed - 10);
         } else if keycode == KeyCode::R {
             aircraft.change_speed(aircraft.speed + 10);
+        } else if keycode == KeyCode::LBracket {
+            self.selected_aircraft = (self.selected_aircraft as i32 - 1).max(0) as usize;
+        } else if keycode == KeyCode::RBracket {
+            self.selected_aircraft = (self.selected_aircraft + 1).min(self.aircraft.len() - 1);
         }
     }
 
