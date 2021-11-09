@@ -57,6 +57,7 @@ struct Aircraft {
     speed: u32,
     on_loc: bool,
     on_ils: bool,
+    cleared_to_land: bool,
 }
 
 const AIRCRAFT_RADIUS: f32 = 5.0;
@@ -117,7 +118,6 @@ impl Runway {
         )
     }
 
-    // TODO: origin fetched from offset + airport
     pub fn as_mesh(
         &self,
         ctx: &mut Context,
@@ -175,6 +175,7 @@ impl Game {
                     speed: 250,
                     on_loc: false,
                     on_ils: false,
+                    cleared_to_land: false,
                 },
                 Aircraft {
                     position: ggez::mint::Point2 { x: 400.0, y: 300.0 },
@@ -184,6 +185,7 @@ impl Game {
                     speed: 220,
                     on_loc: false,
                     on_ils: false,
+                    cleared_to_land: false,
                 },
             ],
         }
@@ -227,6 +229,8 @@ impl EventHandler<ggez::GameError> for Game {
             aircraft.change_speed(aircraft.speed - 10);
         } else if keycode == KeyCode::R {
             aircraft.change_speed(aircraft.speed + 10);
+        } else if keycode == KeyCode::L {
+            aircraft.cleared_to_land = !aircraft.cleared_to_land;
         } else if keycode == KeyCode::LBracket {
             self.selected_aircraft = (self.selected_aircraft as i32 - 1).max(0) as usize;
         } else if keycode == KeyCode::RBracket {
@@ -358,6 +362,11 @@ impl EventHandler<ggez::GameError> for Game {
                 Point { x: 20.0, y: 45.0 },
                 Some(Color::GREEN),
             );
+
+            if aircraft.cleared_to_land {
+                let text = graphics::Text::new("LND");
+                graphics::queue_text(ctx, &text, Point { x: 0.0, y: 55.0 }, Some(Color::GREEN));
+            }
 
             graphics::draw_queued_text(
                 ctx,
