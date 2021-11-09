@@ -20,13 +20,11 @@ fn rotate_point(origin: Point, point: Point, angle: f32) -> Point {
     }
 }
 
-type Line = [Point; 2];
-
-fn rotate_line(origin: Point, line: &Line, angle: f32) -> Line {
-    [
-        rotate_point(origin, line[0], angle),
-        rotate_point(origin, line[1], angle),
-    ]
+fn rotate_points(origin: Point, points: &[Point], angle: f32) -> Vec<Point> {
+    points
+        .iter()
+        .map(|p| rotate_point(origin, *p, angle))
+        .collect()
 }
 
 fn heading_to_vector(heading: i32) -> Point {
@@ -85,6 +83,8 @@ impl Aircraft {
     }
 }
 
+const RUNWAY_DOWNSCALE: f32 = 10.0;
+
 #[derive(Clone, Debug)]
 struct Runway {
     /// offset from airport
@@ -95,35 +95,38 @@ struct Runway {
     length: u32,
     /// width in meters
     width: u32,
+    /// in feet
+    ils_max_altitude: u32,
 }
 
-const RUNWAY_DOWNSCALE: f32 = 10.0;
-
 impl Runway {
-    pub fn as_line(&self, origin: Point) -> Line {
-        [
-            Point {
-                x: origin.x,
-                y: origin.y - (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
-            },
-            Point {
-                x: origin.x,
-                y: origin.y + (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
-            },
-        ]
+    pub fn as_line(&self, origin: Point) -> Vec<Point> {
+        rotate_points(
+            origin,
+            &[
+                Point {
+                    x: origin.x,
+                    y: origin.y - (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
+                },
+                Point {
+                    x: origin.x,
+                    y: origin.y + (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
+                },
+            ],
+            (self.heading as f32).to_radians(),
+        )
     }
 
     // TODO: origin fetched from offset + airport
-    pub fn as_mesh(&self, ctx: &mut Context, origin: Point, color: Color) -> GameResult<graphics::Mesh> {
-        let runway_line = rotate_line(
-            origin, 
-            &self.as_line(origin), 
-            (self.heading as f32).to_radians(),
-        );
-
+    pub fn as_mesh(
+        &self,
+        ctx: &mut Context,
+        origin: Point,
+        color: Color,
+    ) -> GameResult<graphics::Mesh> {
         graphics::Mesh::new_line(
-            ctx, 
-            &runway_line, 
+            ctx,
+            &self.as_line(origin),
             self.width as f32 / RUNWAY_DOWNSCALE,
             color,
         )
@@ -152,6 +155,7 @@ impl Game {
             heading: 290,
             length: 1900,
             width: 35,
+            ils_max_altitude: 2000,
         };
 
         Self {
@@ -258,36 +262,76 @@ impl EventHandler<ggez::GameError> for Game {
             )?;
 
             for runway in &airport.landing_runways {
-                let origin = Point { 
+                let origin = Point {
                     x: airport.position.x + runway.offset.x,
                     y: airport.position.y + runway.offset.y,
                 };
                 let mesh = runway.as_mesh(ctx, origin, Color::BLUE)?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
-                // draw localizer
-                // let mesh = graphics::Mesh::new_polyline(ctx: &mut Context, mode: DrawMode, points: &[P], color: Color)?;
+                let localizer_origin = Point {
+                    // rotated runway line points
+                    x: runway.as_line(origin)[1].x,
+                    y: runway.as_line(origin)[1].y,
+                };
+                let localizer = [
+                    localizer_origin,
+                    // 3 degree variance
+                    rotate_point(
+                        localizer_origin,
+                        Point {
+                            x: localizer_origin.x,
+                            y: localizer_origin.y + 200.0,
+                        },
+                        -3f32.to_radians(),
+                    ),
+                    rotate_point(
+                        localizer_origin,
+                        Point {
+                            x: localizer_origin.x,
+                            y: localizer_origin.y + 200.0,
+                        },
+                        3f32.to_radians(),
+                    ),
+                ];
+
+                let localizer = rotate_points(
+                    localizer_origin,
+                    &localizer,
+                    (runway.heading as f32).to_radians(),
+                );
+
+                let mesh = graphics::Mesh::new_polygon(
+                    ctx,
+                    graphics::DrawMode::stroke(2.0),
+                    &localizer,
+                    Color::BLUE,
+                )?;
+                graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
             }
         }
 
         for aircraft in &self.aircraft {
-            let circle = graphics::Mesh::new_circle(
+            let aircraft_rect = graphics::Mesh::new_rectangle(
                 ctx,
-                graphics::DrawMode::stroke(2.0),
-                aircraft.position,
-                AIRCRAFT_RADIUS,
-                1.0,
+                graphics::DrawMode::fill(),
+                graphics::Rect::new(
+                    aircraft.position.x - AIRCRAFT_RADIUS,
+                    aircraft.position.y - AIRCRAFT_RADIUS,
+                    AIRCRAFT_RADIUS * 2.0,
+                    AIRCRAFT_RADIUS * 2.0,
+                ),
                 Color::GREEN,
             )?;
 
-            graphics::draw(ctx, &circle, (Point { x: 0.0, y: 0.0 },))?;
+            graphics::draw(ctx, &aircraft_rect, (Point { x: 0.0, y: 0.0 },))?;
 
             let bounding_circle = graphics::Mesh::new_circle(
-                ctx, 
-                graphics::DrawMode::stroke(2.0), 
-                aircraft.position, 
+                ctx,
+                graphics::DrawMode::stroke(2.0),
+                aircraft.position,
                 AIRCRAFT_BOUNDING_RADIUS,
-                1.0, 
+                1.0,
                 Color::GREEN,
             )?;
 
