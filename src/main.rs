@@ -61,7 +61,8 @@ struct Aircraft {
     on_ils: bool,
 }
 
-const AIRCRAFT_RADIUS: f32 = 10.0;
+const AIRCRAFT_RADIUS: f32 = 5.0;
+const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
 impl Aircraft {
     pub fn change_heading(&mut self, new_course: i32) {
@@ -149,7 +150,7 @@ impl Game {
         let runway_29 = Runway {
             offset: Point { x: 0.0, y: 0.0 },
             heading: 290,
-            length: 3000,
+            length: 1900,
             width: 35,
         };
 
@@ -235,7 +236,7 @@ impl EventHandler<ggez::GameError> for Game {
             let click_pos = Point { x, y };
 
             for (i, aircraft) in self.aircraft.iter().enumerate() {
-                if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_RADIUS) {
+                if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_BOUNDING_RADIUS) {
                     self.selected_aircraft = i;
                     break;
                 }
@@ -263,6 +264,9 @@ impl EventHandler<ggez::GameError> for Game {
                 };
                 let mesh = runway.as_mesh(ctx, origin, Color::BLUE)?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
+
+                // draw localizer
+                // let mesh = graphics::Mesh::new_polyline(ctx: &mut Context, mode: DrawMode, points: &[P], color: Color)?;
             }
         }
 
@@ -278,25 +282,36 @@ impl EventHandler<ggez::GameError> for Game {
 
             graphics::draw(ctx, &circle, (Point { x: 0.0, y: 0.0 },))?;
 
+            let bounding_circle = graphics::Mesh::new_circle(
+                ctx, 
+                graphics::DrawMode::stroke(2.0), 
+                aircraft.position, 
+                AIRCRAFT_BOUNDING_RADIUS,
+                1.0, 
+                Color::GREEN,
+            )?;
+
+            graphics::draw(ctx, &bounding_circle, (Point { x: 0.0, y: 0.0 },))?;
+
             let callsign_text = graphics::Text::new(aircraft.callsign.clone());
             graphics::queue_text(
                 ctx,
                 &callsign_text,
-                Point { x: -20.0, y: 10.0 },
+                Point { x: -20.0, y: 30.0 },
                 Some(Color::GREEN),
             );
             let heading_text = graphics::Text::new(format!("H{}", aircraft.heading));
             graphics::queue_text(
                 ctx,
                 &heading_text,
-                Point { x: -20.0, y: 25.0 },
+                Point { x: -20.0, y: 45.0 },
                 Some(Color::GREEN),
             );
             let altitude_text = graphics::Text::new(format!("{}", aircraft.altitude));
             graphics::queue_text(
                 ctx,
                 &altitude_text,
-                Point { x: 20.0, y: 25.0 },
+                Point { x: 20.0, y: 45.0 },
                 Some(Color::GREEN),
             );
 
