@@ -10,15 +10,23 @@ fn is_point_in_circle(point: Point, circle_pos: Point, circle_radius: f32) -> bo
     (point.x - circle_pos.x).powi(2) + (point.y - circle_pos.y).powi(2) < circle_radius.powi(2)
 }
 
-fn rotate_point(point: Point, angle: f32) -> Point {
+fn rotate_point(origin: Point, point: Point, angle: f32) -> Point {
+    let cos = angle.cos();
+    let sin = angle.sin();
+
     Point {
-        x: point.x * angle.cos() - point.y * angle.sin(),
-        y: point.y * angle.cos() - point.x * angle.sin(),
+        x: (point.x - origin.x) * cos - (point.y - origin.y) * sin + origin.x,
+        y: (point.y - origin.y) * cos - (point.x - origin.x) * sin + origin.y,
     }
 }
 
-fn point_distance(p1: Point, p2: Point) -> f32 {
-    ((p2.x - p1.x).powi(2) + (p2.y - p1.y).powi(2)).sqrt()
+type Line = [Point; 2];
+
+fn rotate_line(origin: Point, line: &Line, angle: f32) -> Line {
+    [
+        rotate_point(origin, line[0], angle),
+        rotate_point(origin, line[1], angle),
+    ]
 }
 
 fn heading_to_vector(heading: i32) -> Point {
@@ -78,8 +86,9 @@ impl Aircraft {
 
 #[derive(Clone, Debug)]
 struct Runway {
-    /// Offset from airport
-    // offset: Point,
+    /// offset from airport
+    offset: Point,
+    /// bearing
     heading: u32,
     /// length in meters
     length: u32,
@@ -87,9 +96,42 @@ struct Runway {
     width: u32,
 }
 
+const RUNWAY_DOWNSCALE: f32 = 10.0;
+
+impl Runway {
+    pub fn as_line(&self, origin: Point) -> Line {
+        [
+            Point {
+                x: origin.x,
+                y: origin.y - (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
+            },
+            Point {
+                x: origin.x,
+                y: origin.y + (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
+            },
+        ]
+    }
+
+    // TODO: origin fetched from offset + airport
+    pub fn as_mesh(&self, ctx: &mut Context, origin: Point, color: Color) -> GameResult<graphics::Mesh> {
+        let runway_line = rotate_line(
+            origin, 
+            &self.as_line(origin), 
+            (self.heading as f32).to_radians(),
+        );
+
+        graphics::Mesh::new_line(
+            ctx, 
+            &runway_line, 
+            self.width as f32 / RUNWAY_DOWNSCALE,
+            color,
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Airport {
-    // position: Point,
+    position: Point,
     icao_code: String,
     takeoff_runways: Vec<Runway>,
     landing_runways: Vec<Runway>,
@@ -105,6 +147,7 @@ struct Game {
 impl Game {
     pub fn new(_ctx: &mut Context) -> Self {
         let runway_29 = Runway {
+            offset: Point { x: 0.0, y: 0.0 },
             heading: 290,
             length: 3000,
             width: 35,
@@ -112,6 +155,7 @@ impl Game {
 
         Self {
             airports: vec![Airport {
+                position: Point { x: 200.0, y: 300.0 },
                 icao_code: "LCPH".into(),
                 takeoff_runways: vec![runway_29.clone()],
                 landing_runways: vec![runway_29.clone()],
@@ -207,32 +251,17 @@ impl EventHandler<ggez::GameError> for Game {
             graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
             graphics::draw_queued_text(
                 ctx,
-                graphics::DrawParam::new(),
+                graphics::DrawParam::new().dest(airport.position),
                 None,
                 graphics::FilterMode::Linear,
             )?;
 
             for runway in &airport.landing_runways {
-                let scale = 10.0;
-                // let mesh = rotate_rect(
-                //     graphics::Rect::new(
-                //         200.0,
-                //         200.0,
-                //         runway.width as f32 / scale,
-                //         runway.length as f32 / scale,
-                //     ),
-                //     (runway.heading as f32).to_radians(),
-                // ).as_mesh(ctx, graphics::DrawMode::fill(), Color::BLUE)?;
-                let origin = Point { x: 200.0, y: 200.0 };
-
-                let runway_line = [
-                    Point { x: origin.x, y: origin.y },
-                    Point { x: origin.x, y: origin.y + runway.length as f32 / scale},
-                ];
-                let mesh = graphics::Mesh::new_line(
-                    ctx, &runway_line, runway.width as f32 / scale, Color::BLUE
-                )?;
-
+                let origin = Point { 
+                    x: airport.position.x + runway.offset.x,
+                    y: airport.position.y + runway.offset.y,
+                };
+                let mesh = runway.as_mesh(ctx, origin, Color::BLUE)?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
             }
         }
