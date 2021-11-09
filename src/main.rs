@@ -10,6 +10,86 @@ fn is_point_in_circle(point: Point, circle_pos: Point, circle_radius: f32) -> bo
     (point.x - circle_pos.x).powi(2) + (point.y - circle_pos.y).powi(2) < circle_radius.powi(2)
 }
 
+fn rotate_point(point: Point, angle: f32) -> Point {
+    Point {
+        x: point.x * angle.cos() - point.y * angle.sin(),
+        y: point.y * angle.cos() - point.x * angle.sin(),
+    }
+}
+
+fn point_distance(p1: Point, p2: Point) -> f32 {
+    ((p2.x - p1.x).powi(2) + (p2.y - p1.y).powi(2)).sqrt()
+}
+
+#[derive(Clone, Debug)]
+struct PointRect {
+    top_left: Point,
+    top_right: Point,
+    bottom_left: Point,
+    bottom_right: Point,
+}
+
+impl PointRect {
+    pub fn as_mesh(
+        self,
+        ctx: &mut Context,
+        mode: graphics::DrawMode,
+        color: Color,
+    ) -> GameResult<graphics::Mesh> {
+        // clockwise, order matters
+        let points = [
+            self.top_left,
+            self.top_right,
+            self.bottom_right,
+            self.bottom_left,
+        ];
+        graphics::Mesh::new_polygon(ctx, mode, &points, color)
+    }
+}
+
+/// Rotate a rectangle by an angle, in radians.
+fn rotate_rect(rect: graphics::Rect, angle: f32) -> PointRect {
+    let p1 = Point {
+        x: rect.x,
+        y: rect.y,
+    };
+    let p2 = Point {
+        x: rect.x + rect.w,
+        y: rect.y,
+    };
+    let p3 = Point {
+        x: rect.x,
+        y: rect.y + rect.h,
+    };
+    let p4 = Point {
+        x: rect.x + rect.w,
+        y: rect.y + rect.h,
+    };
+
+    println!("p1 (b): {:?}", p1);
+    println!("p2 (b): {:?}", p2);
+    println!("p3 (b): {:?}", p3);
+    println!("p4 (b): {:?}", p4);
+
+    let p1 = rotate_point(p1, angle);
+    let p2 = rotate_point(p2, angle);
+    let p3 = rotate_point(p3, angle);
+    let p4 = rotate_point(p4, angle);
+
+    println!("p1 (a): {:?}", p1);
+    println!("p2 (a): {:?}", p2);
+    println!("p3 (a): {:?}", p3);
+    println!("p4 (a): {:?}", p4);
+
+    // graphics::Rect::new(p1.x, p1.y, point_distance(p1, p2), point_distance(p1, p3))
+    PointRect {
+        top_left: p1,
+        top_right: p2,
+        bottom_left: p3,
+        bottom_right: p4,
+    }
+}
+
 fn heading_to_vector(heading: i32) -> Point {
     let heading = (heading as f32 - 90.0).to_radians();
     Point {
@@ -203,19 +283,22 @@ impl EventHandler<ggez::GameError> for Game {
 
             for runway in &airport.landing_runways {
                 let length_scale = 10.0;
-                let rectangle = graphics::Mesh::new_rectangle(
-                    ctx,
-                    graphics::DrawMode::fill(),
-                    graphics::Rect::new(
-                        200.0,
-                        200.0,
-                        runway.width as f32 / length_scale,
-                        runway.length as f32 / length_scale,
-                    ),
-                    Color::BLUE,
-                )?;
+                // let mesh = rotate_rect(
+                //     graphics::Rect::new(
+                //         200.0,
+                //         200.0,
+                //         runway.width as f32 / length_scale,
+                //         runway.length as f32 / length_scale,
+                //     ),
+                //     (runway.heading as f32).to_radians(),
+                // ).as_mesh(ctx, graphics::DrawMode::fill(), Color::BLUE)?;
+                let runway_line = [
+                    Point { x: 200.0, y: 200.0 },
+                    Point { x: 300.0, y: 300.0},
+                ];
+                let mesh = graphics::Mesh::new_line(ctx, &runway_line, runway.width as f32 / length_scale, Color::BLUE)?;
 
-                graphics::draw(ctx, &rectangle, (Point { x: 0.0, y: 0.0 },))?;
+                graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
             }
         }
 
