@@ -293,6 +293,7 @@ impl EventHandler<ggez::GameError> for Game {
 
                         if aircraft.is_localizer_captured(&runway.localizer(origin)) {
                             println!("Localizer capture: {:?}", aircraft);
+                            aircraft.heading = runway.heading as i32;
                         }
                     }
                 }
