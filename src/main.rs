@@ -50,14 +50,14 @@ fn heading_to_vector(heading: i32) -> Point {
     }
 }
 
-fn main() {
-    let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
-        .build()
-        .expect("Could not create ggez context");
-
-    let game = Game::new(&mut ctx);
-
-    event::run(ctx, event_loop, game);
+/// Translates the world coordinate system, which
+/// has Y pointing up and the origin at the center,
+/// to the screen coordinate system, which has Y
+/// pointing downward and the origin at the top-left,
+fn world_to_screen_coords(screen_width: f32, screen_height: f32, point: Point) -> Point {
+    let x = point.x + screen_width / 2.0;
+    let y = screen_height - (point.y + screen_height / 2.0);
+    Point { x, y, }
 }
 
 #[derive(Clone, Debug)]
@@ -81,7 +81,7 @@ struct Aircraft {
     cleared_to_land: bool,
 }
 
-const AIRCRAFT_RADIUS: f32 = 5.0;
+const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
 impl Aircraft {
@@ -103,45 +103,46 @@ impl Aircraft {
         // TODO: depends on aircraft type
         self.speed = new_speed.clamp(150, 250);
     }
+
+    fn is_localizer_captured(&self, localizer: &Localizer) -> bool {
+        is_point_in_triangle(self.position, localizer.as_triangle())
+    }
 }
 
 #[derive(Clone, Debug)]
 struct Localizer {
+    // position at end of the runway
     origin: Point,
+    runway: Runway,
 }
 
 impl Localizer {
-    fn as_triangle(&self, runway: Runway) -> Vec<Point> {
-        let localizer_origin = Point {
-            // rotated runway line points
-            x: runway.as_line(self.origin)[1].x,
-            y: runway.as_line(self.origin)[1].y,
-        };
+    fn as_triangle(&self) -> Vec<Point> {
         let localizer = [
-            localizer_origin,
+            self.origin,
             // 3 degree variance
             rotate_point(
-                localizer_origin,
+                self.origin,
                 Point {
-                    x: localizer_origin.x,
-                    y: localizer_origin.y + 200.0,
+                    x: self.origin.x,
+                    y: self.origin.y + 200.0,
                 },
                 -3f32.to_radians(),
             ),
             rotate_point(
-                localizer_origin,
+                self.origin,
                 Point {
-                    x: localizer_origin.x,
-                    y: localizer_origin.y + 200.0,
+                    x: self.origin.x,
+                    y: self.origin.y + 200.0,
                 },
                 3f32.to_radians(),
             ),
         ];
 
         rotate_points(
-            localizer_origin,
+            self.origin,
             &localizer,
-            (runway.heading as f32).to_radians(),
+            (self.runway.heading as f32).to_radians(),
         )
     }
 }
@@ -180,38 +181,14 @@ impl Runway {
         )
     }
 
-    fn localizer_points(&self, origin: Point) -> Vec<Point> {
-        let localizer_origin = Point {
+    fn localizer(&self, origin: Point) -> Localizer {
+        let origin = Point {
             // rotated runway line points
             x: self.as_line(origin)[1].x,
             y: self.as_line(origin)[1].y,
         };
-        let localizer = [
-            localizer_origin,
-            // 3 degree variance
-            rotate_point(
-                localizer_origin,
-                Point {
-                    x: localizer_origin.x,
-                    y: localizer_origin.y + 200.0,
-                },
-                -3f32.to_radians(),
-            ),
-            rotate_point(
-                localizer_origin,
-                Point {
-                    x: localizer_origin.x,
-                    y: localizer_origin.y + 200.0,
-                },
-                3f32.to_radians(),
-            ),
-        ];
-
-        rotate_points(
-            localizer_origin,
-            &localizer,
-            (self.heading as f32).to_radians(),
-        )
+        // note, state not automatically updated
+        Localizer { origin, runway: self.clone(), }
     }
 
     pub fn as_mesh(
@@ -265,7 +242,7 @@ impl Game {
 
         Self {
             airports: vec![Airport {
-                position: Point { x: 200.0, y: 300.0 },
+                position: Point { x: 500.0, y: 550.0 },
                 icao_code: "LCPH".into(),
                 takeoff_runways: vec![runway_29.clone()],
                 landing_runways: vec![runway_29.clone()],
@@ -313,10 +290,9 @@ impl EventHandler<ggez::GameError> for Game {
                 for airport in &self.airports {
                     for runway in &airport.landing_runways {
                         let origin = airport.origin(runway);
-                        let localizer = runway.localizer_points(origin);
 
-                        if is_point_in_triangle(aircraft.position, localizer) {
-                            println!("POINT IN RECT: {:?}", aircraft);
+                        if aircraft.is_localizer_captured(&runway.localizer(origin)) {
+                            println!("Localizer capture: {:?}", aircraft);
                         }
                     }
                 }
@@ -391,7 +367,7 @@ impl EventHandler<ggez::GameError> for Game {
                 let mesh = runway.as_mesh(ctx, origin, Color::RED)?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
-                let localizer = runway.localizer_points(origin);
+                let localizer = runway.localizer(origin).as_triangle();
                 let mesh = graphics::Mesh::new_polygon(
                     ctx,
                     graphics::DrawMode::stroke(2.0),
@@ -484,4 +460,14 @@ impl EventHandler<ggez::GameError> for Game {
 
         graphics::present(ctx)
     }
+}
+
+fn main() {
+    let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
+        .window_mode(ggez::conf::WindowMode::default().dimensions(1280.0, 960.0))
+        .build()
+        .expect("Could not create ggez context");
+
+    let game = Game::new(&mut ctx);
+    event::run(ctx, event_loop, game);
 }
