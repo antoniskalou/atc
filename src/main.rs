@@ -15,14 +15,18 @@ fn sign(p1: Point, p2: Point, p3: Point) -> f32 {
 }
 
 fn is_point_in_triangle(point: Point, triangle: Vec<Point>) -> bool {
-    let d1 = sign(point, triangle[0], triangle[1]);
-    let d2 = sign(point, triangle[1], triangle[2]);
-    let d3 = sign(point, triangle[2], triangle[0]);
+    let s = sign(point, triangle[0], triangle[2]);
+    let t = sign(point, triangle[1], triangle[0]);
 
-    let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
-    let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
+    println!("s: {}, t: {}", s, t);
 
-    !(has_neg && has_pos)
+    if (s < 0.0) != (t < 0.0) && s != 0.0 && t != 0.0 {
+        false
+    } else {
+        let d = sign(point, triangle[2], triangle[1]);
+        println!("d: {}", d);
+        d == 0.0 || (d < 0.0) == (s + t <= 0.0)
+    }
 }
 
 fn rotate_point(origin: Point, point: Point, angle: f32) -> Point {
