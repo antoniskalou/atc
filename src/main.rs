@@ -10,6 +10,21 @@ fn is_point_in_circle(point: Point, circle_pos: Point, circle_radius: f32) -> bo
     (point.x - circle_pos.x).powi(2) + (point.y - circle_pos.y).powi(2) < circle_radius.powi(2)
 }
 
+fn sign(p1: Point, p2: Point, p3: Point) -> f32 {
+    (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+}
+
+fn is_point_in_triangle(point: Point, triangle: Vec<Point>) -> bool {
+    let d1 = sign(point, triangle[0], triangle[1]);
+    let d2 = sign(point, triangle[1], triangle[2]);
+    let d3 = sign(point, triangle[2], triangle[0]);
+
+    let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
+    let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
+
+    !(has_neg && has_pos)
+}
+
 fn rotate_point(origin: Point, point: Point, angle: f32) -> Point {
     let cos = angle.cos();
     let sin = angle.sin();
@@ -43,6 +58,12 @@ fn main() {
     let game = Game::new(&mut ctx);
 
     event::run(ctx, event_loop, game);
+}
+
+#[derive(Clone, Debug)]
+struct AircraftDefinition {
+    max_speed: u32,
+    min_speed: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +105,47 @@ impl Aircraft {
     }
 }
 
+#[derive(Clone, Debug)]
+struct Localizer {
+    origin: Point,
+}
+
+impl Localizer {
+    fn as_triangle(&self, runway: Runway) -> Vec<Point> {
+        let localizer_origin = Point {
+            // rotated runway line points
+            x: runway.as_line(self.origin)[1].x,
+            y: runway.as_line(self.origin)[1].y,
+        };
+        let localizer = [
+            localizer_origin,
+            // 3 degree variance
+            rotate_point(
+                localizer_origin,
+                Point {
+                    x: localizer_origin.x,
+                    y: localizer_origin.y + 200.0,
+                },
+                -3f32.to_radians(),
+            ),
+            rotate_point(
+                localizer_origin,
+                Point {
+                    x: localizer_origin.x,
+                    y: localizer_origin.y + 200.0,
+                },
+                3f32.to_radians(),
+            ),
+        ];
+
+        rotate_points(
+            localizer_origin,
+            &localizer,
+            (runway.heading as f32).to_radians(),
+        )
+    }
+}
+
 const RUNWAY_DOWNSCALE: f32 = 10.0;
 
 #[derive(Clone, Debug)]
@@ -118,6 +180,40 @@ impl Runway {
         )
     }
 
+    fn localizer_points(&self, origin: Point) -> Vec<Point> {
+        let localizer_origin = Point {
+            // rotated runway line points
+            x: self.as_line(origin)[1].x,
+            y: self.as_line(origin)[1].y,
+        };
+        let localizer = [
+            localizer_origin,
+            // 3 degree variance
+            rotate_point(
+                localizer_origin,
+                Point {
+                    x: localizer_origin.x,
+                    y: localizer_origin.y + 200.0,
+                },
+                -3f32.to_radians(),
+            ),
+            rotate_point(
+                localizer_origin,
+                Point {
+                    x: localizer_origin.x,
+                    y: localizer_origin.y + 200.0,
+                },
+                3f32.to_radians(),
+            ),
+        ];
+
+        rotate_points(
+            localizer_origin,
+            &localizer,
+            (self.heading as f32).to_radians(),
+        )
+    }
+
     pub fn as_mesh(
         &self,
         ctx: &mut Context,
@@ -139,6 +235,15 @@ struct Airport {
     icao_code: String,
     takeoff_runways: Vec<Runway>,
     landing_runways: Vec<Runway>,
+}
+
+impl Airport {
+    fn origin(&self, runway: &Runway) -> Point {
+        Point {
+            x: self.position.x + runway.offset.x,
+            y: self.position.y + runway.offset.y,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -201,6 +306,22 @@ impl EventHandler<ggez::GameError> for Game {
             let speed_change = (aircraft.speed as f32 * dt.as_secs_f32()) / speed_scale;
 
             let heading = heading_to_vector(aircraft.heading);
+
+            // TODO: check if intercepting ILS
+            if aircraft.cleared_to_land {
+                // super inefficient
+                for airport in &self.airports {
+                    for runway in &airport.landing_runways {
+                        let origin = airport.origin(runway);
+                        let localizer = runway.localizer_points(origin);
+
+                        if is_point_in_triangle(aircraft.position, localizer) {
+                            println!("POINT IN RECT: {:?}", aircraft);
+                        }
+                    }
+                }
+            }
+
             aircraft.position.x += speed_change * heading.x;
             aircraft.position.y += speed_change * heading.y;
         }
@@ -266,45 +387,11 @@ impl EventHandler<ggez::GameError> for Game {
             )?;
 
             for runway in &airport.landing_runways {
-                let origin = Point {
-                    x: airport.position.x + runway.offset.x,
-                    y: airport.position.y + runway.offset.y,
-                };
-                let mesh = runway.as_mesh(ctx, origin, Color::BLUE)?;
+                let origin = airport.origin(runway);
+                let mesh = runway.as_mesh(ctx, origin, Color::RED)?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
-                let localizer_origin = Point {
-                    // rotated runway line points
-                    x: runway.as_line(origin)[1].x,
-                    y: runway.as_line(origin)[1].y,
-                };
-                let localizer = [
-                    localizer_origin,
-                    // 3 degree variance
-                    rotate_point(
-                        localizer_origin,
-                        Point {
-                            x: localizer_origin.x,
-                            y: localizer_origin.y + 200.0,
-                        },
-                        -3f32.to_radians(),
-                    ),
-                    rotate_point(
-                        localizer_origin,
-                        Point {
-                            x: localizer_origin.x,
-                            y: localizer_origin.y + 200.0,
-                        },
-                        3f32.to_radians(),
-                    ),
-                ];
-
-                let localizer = rotate_points(
-                    localizer_origin,
-                    &localizer,
-                    (runway.heading as f32).to_radians(),
-                );
-
+                let localizer = runway.localizer_points(origin);
                 let mesh = graphics::Mesh::new_polygon(
                     ctx,
                     graphics::DrawMode::stroke(2.0),
