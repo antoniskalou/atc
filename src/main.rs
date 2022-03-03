@@ -1,64 +1,11 @@
+mod geom;
+
 use ggez::{
     event::{self, EventHandler, KeyCode, MouseButton},
     graphics::{self, Color},
     timer, Context, ContextBuilder, GameResult,
 };
-
-type Point = ggez::mint::Point2<f32>;
-
-fn is_point_in_circle(point: Point, circle_pos: Point, circle_radius: f32) -> bool {
-    (point.x - circle_pos.x).powi(2) + (point.y - circle_pos.y).powi(2) < circle_radius.powi(2)
-}
-
-fn sign(p1: Point, p2: Point, p3: Point) -> f32 {
-    (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
-}
-
-fn is_point_in_triangle(point: Point, triangle: Vec<Point>) -> bool {
-    let d1 = sign(point, triangle[0], triangle[1]);
-    let d2 = sign(point, triangle[1], triangle[2]);
-    let d3 = sign(point, triangle[2], triangle[0]);
-
-    let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
-    let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
-
-    !(has_neg && has_pos)
-}
-
-fn rotate_point(origin: Point, point: Point, angle: f32) -> Point {
-    let cos = angle.cos();
-    let sin = angle.sin();
-
-    Point {
-        x: (point.x - origin.x) * cos - (point.y - origin.y) * sin + origin.x,
-        y: (point.y - origin.y) * cos - (point.x - origin.x) * sin + origin.y,
-    }
-}
-
-fn rotate_points(origin: Point, points: &[Point], angle: f32) -> Vec<Point> {
-    points
-        .iter()
-        .map(|p| rotate_point(origin, *p, angle))
-        .collect()
-}
-
-fn heading_to_vector(heading: i32) -> Point {
-    let heading = (heading as f32 - 90.0).to_radians();
-    Point {
-        x: heading.cos(),
-        y: heading.sin(),
-    }
-}
-
-/// Translates the world coordinate system, which
-/// has Y pointing up and the origin at the center,
-/// to the screen coordinate system, which has Y
-/// pointing downward and the origin at the top-left,
-fn world_to_screen_coords(screen_width: f32, screen_height: f32, point: Point) -> Point {
-    let x = point.x + screen_width / 2.0;
-    let y = screen_height - (point.y + screen_height / 2.0);
-    Point { x, y, }
-}
+use crate::geom::*;
 
 #[derive(Clone, Debug)]
 struct AircraftDefinition {
@@ -76,8 +23,7 @@ struct Aircraft {
     altitude: u32,
     /// knots
     speed: u32,
-    on_loc: bool,
-    on_ils: bool,
+    on_ils: Option<ILS>,
     cleared_to_land: bool,
 }
 
@@ -104,19 +50,25 @@ impl Aircraft {
         self.speed = new_speed.clamp(150, 250);
     }
 
-    fn is_localizer_captured(&self, localizer: &Localizer) -> bool {
+    fn is_localizer_captured(&self, localizer: &ILS) -> bool {
         is_point_in_triangle(self.position, localizer.as_triangle())
+    }
+
+    fn is_grounded(&self) -> bool {
+        self.speed <= 0 && self.speed <= 0
     }
 }
 
+const ILS_LENGTH: f32 = 300.0;
+
 #[derive(Clone, Debug)]
-struct Localizer {
+struct ILS {
     // position at end of the runway
     origin: Point,
     runway: Runway,
 }
 
-impl Localizer {
+impl ILS {
     fn as_triangle(&self) -> Vec<Point> {
         let localizer = [
             self.origin,
@@ -125,7 +77,7 @@ impl Localizer {
                 self.origin,
                 Point {
                     x: self.origin.x,
-                    y: self.origin.y + 200.0,
+                    y: self.origin.y + ILS_LENGTH,
                 },
                 -3f32.to_radians(),
             ),
@@ -133,7 +85,7 @@ impl Localizer {
                 self.origin,
                 Point {
                     x: self.origin.x,
-                    y: self.origin.y + 200.0,
+                    y: self.origin.y + ILS_LENGTH,
                 },
                 3f32.to_radians(),
             ),
@@ -144,6 +96,16 @@ impl Localizer {
             &localizer,
             (self.runway.heading as f32).to_radians(),
         )
+    }
+
+    fn distance(&self, position: Point) -> f32 {
+        point_distance(position, self.origin)
+    }
+
+    fn altitude(&self, position: Point) -> u32 {
+        let distance = self.distance(position);
+        let expected_alt = self.runway.ils_max_altitude as f32 * (distance / ILS_LENGTH);
+        expected_alt as u32
     }
 }
 
@@ -181,14 +143,19 @@ impl Runway {
         )
     }
 
-    fn localizer(&self, origin: Point) -> Localizer {
+    fn ils(&self, origin: Point) -> ILS {
         let origin = Point {
             // rotated runway line points
             x: self.as_line(origin)[1].x,
             y: self.as_line(origin)[1].y,
         };
         // note, state not automatically updated
-        Localizer { origin, runway: self.clone(), }
+        ILS { origin, runway: self.clone(), }
+    }
+
+    // TODO
+    fn has_landed(&self, origin: Point, aircraft: &Aircraft) -> bool {
+        is_point_in_circle(aircraft.position, origin, 10.0)
     }
 
     pub fn as_mesh(
@@ -255,18 +222,16 @@ impl Game {
                     heading: 90,
                     altitude: 6000,
                     speed: 250,
-                    on_loc: false,
-                    on_ils: false,
+                    on_ils: None,
                     cleared_to_land: false,
                 },
                 Aircraft {
-                    position: ggez::mint::Point2 { x: 400.0, y: 300.0 },
+                    position: ggez::mint::Point2 { x: 500.0, y: 400.0 },
                     callsign: "TRA1112".into(),
                     heading: 180,
                     altitude: 12000,
                     speed: 220,
-                    on_loc: false,
-                    on_ils: false,
+                    on_ils: None,
                     cleared_to_land: false,
                 },
             ],
@@ -283,25 +248,40 @@ impl EventHandler<ggez::GameError> for Game {
             let speed_change = (aircraft.speed as f32 * dt.as_secs_f32()) / speed_scale;
 
             let heading = heading_to_vector(aircraft.heading);
+            aircraft.position.x += speed_change * heading.x;
+            aircraft.position.y += speed_change * heading.y;
 
             // TODO: check if intercepting ILS
-            if aircraft.cleared_to_land {
+            if aircraft.cleared_to_land && !aircraft.is_grounded() {
+                if let Some(ils) = &aircraft.on_ils {
+                    let distance = ils.distance(aircraft.position);
+                    // 200.0 is localizer length
+                    let expected_alt = ils.altitude(aircraft.position);
+                    println!("Distance: {}, Altitude: {}", distance, expected_alt);
+                }
+
                 // super inefficient
                 for airport in &self.airports {
                     for runway in &airport.landing_runways {
                         let origin = airport.origin(runway);
+                        let ils = runway.ils(origin);
 
-                        if aircraft.is_localizer_captured(&runway.localizer(origin)) {
-                            println!("Localizer capture: {:?}", aircraft);
+                        if runway.has_landed(origin, aircraft) {
+                            println!("Aircraft landed: {:?}", aircraft);
+                            aircraft.speed = 0;
+                            aircraft.altitude = 0;
+                            aircraft.cleared_to_land = false;
+                        } else if aircraft.is_localizer_captured(&ils) {
                             aircraft.heading = runway.heading as i32;
+                            aircraft.on_ils = Some(ils);
                         }
                     }
                 }
             }
-
-            aircraft.position.x += speed_change * heading.x;
-            aircraft.position.y += speed_change * heading.y;
         }
+
+        // remove landed aircraft
+        self.aircraft.retain(|a| !a.is_grounded());
 
         Ok(())
     }
@@ -368,11 +348,11 @@ impl EventHandler<ggez::GameError> for Game {
                 let mesh = runway.as_mesh(ctx, origin, Color::RED)?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
-                let localizer = runway.localizer(origin).as_triangle();
+                let ils = runway.ils(origin).as_triangle();
                 let mesh = graphics::Mesh::new_polygon(
                     ctx,
                     graphics::DrawMode::stroke(2.0),
-                    &localizer,
+                    &ils,
                     Color::BLUE,
                 )?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
@@ -429,7 +409,12 @@ impl EventHandler<ggez::GameError> for Game {
 
             if aircraft.cleared_to_land {
                 let text = graphics::Text::new("LND");
-                graphics::queue_text(ctx, &text, Point { x: 0.0, y: 55.0 }, Some(Color::GREEN));
+                graphics::queue_text(ctx, &text, Point { x: -20.0, y: 55.0 }, Some(Color::GREEN));
+            }
+
+            if aircraft.on_ils.is_some() {
+                let text = graphics::Text::new("LOC");
+                graphics::queue_text(ctx, &text, Point { x: 20.0, y: 55.0 }, Some(Color::GREEN));
             }
 
             graphics::draw_queued_text(
