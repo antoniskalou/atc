@@ -51,7 +51,8 @@ impl Aircraft {
     }
 
     fn is_localizer_captured(&self, localizer: &ILS) -> bool {
-        is_point_in_triangle(self.position, localizer.as_triangle())
+        is_point_in_triangle(self.position, localizer.as_triangle()) &&
+            self.altitude <= localizer.altitude(self.position)
     }
 
     fn is_grounded(&self) -> bool {
@@ -255,9 +256,9 @@ impl EventHandler<ggez::GameError> for Game {
             if aircraft.cleared_to_land && !aircraft.is_grounded() {
                 if let Some(ils) = &aircraft.on_ils {
                     let distance = ils.distance(aircraft.position);
-                    // 200.0 is localizer length
                     let expected_alt = ils.altitude(aircraft.position);
                     println!("Distance: {}, Altitude: {}", distance, expected_alt);
+                    aircraft.altitude = expected_alt;
                 }
 
                 // super inefficient
@@ -271,6 +272,7 @@ impl EventHandler<ggez::GameError> for Game {
                             aircraft.speed = 0;
                             aircraft.altitude = 0;
                             aircraft.cleared_to_land = false;
+                            aircraft.on_ils = None;
                         } else if aircraft.is_localizer_captured(&ils) {
                             aircraft.heading = runway.heading as i32;
                             aircraft.on_ils = Some(ils);
@@ -450,6 +452,7 @@ impl EventHandler<ggez::GameError> for Game {
 
 fn main() {
     let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
+        .window_setup(ggez::conf::WindowSetup::default().title("ATC Simulator 2022"))
         .window_mode(ggez::conf::WindowMode::default().dimensions(1280.0, 960.0))
         .build()
         .expect("Could not create ggez context");
