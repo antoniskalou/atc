@@ -7,6 +7,42 @@ use ggez::{
 };
 use crate::geom::*;
 
+struct ATC;
+
+impl ATC {
+    fn command(aircraft: &mut Aircraft, cmd: ATCCommand) {
+        use ATCCommand::*;
+        match cmd {
+            ChangeHeading(heading) => {
+                // request, TODO: move to ATC.command(aircraft, cmd)
+                println!("{}, ATC, heading to {}", aircraft.callsign, aircraft.heading);
+                aircraft.change_heading(heading)
+                // reply
+                // TODO
+            },
+            ChangeAltitude(altitude) => {
+                println!("{}, ATC, altitude to {}", aircraft.callsign, aircraft.altitude);
+                aircraft.change_altitude(altitude)
+            },
+            ChangeSpeed(speed) => { 
+                println!("{}, ATC, speed to {}", aircraft.callsign, aircraft.speed);
+                aircraft.change_speed(speed)
+            },
+            ClearedToLand(is_cleared) => {
+                println!("{}, ATC, cleared to land", aircraft.callsign);
+                aircraft.cleared_to_land = is_cleared;
+            }
+        }
+    }
+}
+
+enum ATCCommand {
+    ChangeHeading(i32),
+    ChangeAltitude(u32),
+    ChangeSpeed(u32),
+    ClearedToLand(bool),
+}
+
 #[derive(Clone, Debug)]
 struct AircraftDefinition {
     max_speed: u32,
@@ -106,7 +142,9 @@ impl ILS {
     fn altitude(&self, position: Point) -> u32 {
         let distance = self.distance(position);
         let expected_alt = self.runway.ils_max_altitude as f32 * (distance / ILS_LENGTH);
-        expected_alt as u32
+        // round to 1000
+        let rounded_alt = (expected_alt / 1000.0).round() * 1000.0;
+        rounded_alt as u32
     }
 }
 
@@ -298,19 +336,25 @@ impl EventHandler<ggez::GameError> for Game {
         let aircraft = &mut self.aircraft[self.selected_aircraft];
 
         if keycode == KeyCode::A {
-            aircraft.change_heading(aircraft.heading - 5);
+            let new_heading = aircraft.heading - 5;
+            ATC::command(aircraft, ATCCommand::ChangeHeading(new_heading));
         } else if keycode == KeyCode::D {
-            aircraft.change_heading(aircraft.heading + 5);
+            let new_heading = aircraft.heading + 5;
+            ATC::command(aircraft, ATCCommand::ChangeHeading(new_heading));
         } else if keycode == KeyCode::S {
-            aircraft.change_altitude(aircraft.altitude - 1000);
+            let new_alt = aircraft.altitude - 1000;
+            ATC::command(aircraft, ATCCommand::ChangeAltitude(new_alt));
         } else if keycode == KeyCode::W {
-            aircraft.change_altitude(aircraft.altitude + 1000);
+            let new_alt = aircraft.altitude + 1000;
+            ATC::command(aircraft, ATCCommand::ChangeAltitude(new_alt));
         } else if keycode == KeyCode::F {
-            aircraft.change_speed(aircraft.speed - 10);
+            let new_speed = aircraft.speed - 10;
+            ATC::command(aircraft, ATCCommand::ChangeSpeed(new_speed));
         } else if keycode == KeyCode::R {
-            aircraft.change_speed(aircraft.speed + 10);
+            let new_speed = aircraft.speed + 10;
+            ATC::command(aircraft, ATCCommand::ChangeSpeed(new_speed));
         } else if keycode == KeyCode::L {
-            aircraft.cleared_to_land = !aircraft.cleared_to_land;
+            ATC::command(aircraft, ATCCommand::ClearedToLand(!aircraft.cleared_to_land));
         } else if keycode == KeyCode::LBracket {
             self.selected_aircraft = (self.selected_aircraft as i32 - 1).max(0) as usize;
         } else if keycode == KeyCode::RBracket {
