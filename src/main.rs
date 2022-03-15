@@ -8,7 +8,7 @@ use ggez::{
 };
 use crate::geom::*;
 
-const TTS_ENABLED: bool = true;
+const TTS_ENABLED: bool = false;
 
 #[derive(Debug)]
 struct ATC {
@@ -45,7 +45,11 @@ impl ATC {
             ChangeAltitude(altitude) => aircraft.change_altitude(altitude),
             ChangeSpeed(speed) => aircraft.change_speed(speed),
             ClearedToLand(is_cleared) => {
-                aircraft.cleared_to_land = is_cleared;
+                if is_cleared { 
+                    aircraft.status = AircraftStatus::Landing;
+                } else {
+                    aircraft.status = AircraftStatus::Flight;
+                }
             }
         }
     }
@@ -59,6 +63,40 @@ enum ATCCommand {
 }
 
 impl ATCCommand {
+    fn from_string(s: String) -> Vec<ATCCommand> {
+        let command_parts: Vec<&str> = s.split(' ').collect();
+    
+        let mut commands = Vec::new();
+        let mut iter = command_parts.iter();
+        loop {
+            let cmd = iter.next()
+                .map(|x| x.to_uppercase())
+                .map(|x| match x.as_str() {
+                    "LND" => ATCCommand::ClearedToLand(true), 
+                    "HDG" => { 
+                        // TODO: error handling
+                        let hdg = iter.next().unwrap();
+                        ATCCommand::ChangeHeading(hdg.parse::<i32>().unwrap())
+                    },
+                    "ALT" => {
+                        let alt = iter.next().unwrap();
+                        ATCCommand::ChangeAltitude(alt.parse::<u32>().unwrap())
+                    },
+                    "SPD" => {
+                        let spd = iter.next().unwrap();
+                        ATCCommand::ChangeSpeed(spd.parse::<u32>().unwrap())
+                    }
+                    _ => panic!("invalid command: {}", x)
+                });
+
+            match cmd {
+                Some(cmd) => commands.push(cmd),
+                None => break,
+            }
+        }
+        commands
+    }
+
     fn as_string(&self) -> String {
         use ATCCommand::*;
         match self {
@@ -101,6 +139,15 @@ struct AircraftDefinition {
     min_speed: u32,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+enum AircraftStatus {
+    Taxi,
+    Takeoff,
+    Landing,
+    Landed,
+    Flight,
+}
+
 #[derive(Clone, Debug)]
 struct Aircraft {
     position: Point,
@@ -112,7 +159,7 @@ struct Aircraft {
     /// knots
     speed: u32,
     on_ils: Option<ILS>,
-    cleared_to_land: bool,
+    status: AircraftStatus,
 }
 
 const AIRCRAFT_RADIUS: f32 = 4.0;
@@ -144,7 +191,11 @@ impl Aircraft {
     }
 
     fn is_grounded(&self) -> bool {
-        self.speed <= 0 && self.speed <= 0
+        self.status == AircraftStatus::Taxi || self.status == AircraftStatus::Landed
+    }
+
+    fn cleared_to_land(&self) -> bool {
+        self.status == AircraftStatus::Landing
     }
 }
 
@@ -316,7 +367,7 @@ impl Game {
                     altitude: 6000,
                     speed: 250,
                     on_ils: None,
-                    cleared_to_land: false,
+                    status: AircraftStatus::Flight,
                 },
                 Aircraft {
                     position: ggez::mint::Point2 { x: 500.0, y: 400.0 },
@@ -325,7 +376,7 @@ impl Game {
                     altitude: 12000,
                     speed: 220,
                     on_ils: None,
-                    cleared_to_land: false,
+                    status: AircraftStatus::Flight,
                 },
             ],
         }
@@ -337,19 +388,19 @@ impl EventHandler<ggez::GameError> for Game {
         let dt = timer::delta(ctx);
 
         for mut aircraft in &mut self.aircraft {
-            let speed_scale = 25.0;
-            let speed_change = (aircraft.speed as f32 * dt.as_secs_f32()) / speed_scale;
+            if !aircraft.is_grounded() {
+                let speed_scale = 25.0;
+                let speed_change = (aircraft.speed as f32 * dt.as_secs_f32()) / speed_scale;
 
-            let heading = heading_to_vector(aircraft.heading);
-            aircraft.position.x += speed_change * heading.x;
-            aircraft.position.y += speed_change * heading.y;
+                let heading = heading_to_vector(aircraft.heading);
+                aircraft.position.x += speed_change * heading.x;
+                aircraft.position.y += speed_change * heading.y;
+            }
 
             // TODO: check if intercepting ILS
-            if aircraft.cleared_to_land && !aircraft.is_grounded() {
+            if aircraft.cleared_to_land() {
                 if let Some(ils) = &aircraft.on_ils {
-                    let distance = ils.distance(aircraft.position);
                     let expected_alt = ils.altitude(aircraft.position);
-                    println!("Distance: {}, Altitude: {}", distance, expected_alt);
                     aircraft.altitude = expected_alt;
                 }
 
@@ -361,13 +412,12 @@ impl EventHandler<ggez::GameError> for Game {
 
                         if runway.has_landed(origin, aircraft) {
                             println!("Aircraft landed: {:?}", aircraft);
-                            aircraft.speed = 0;
-                            aircraft.altitude = 0;
-                            aircraft.cleared_to_land = false;
                             aircraft.on_ils = None;
+                            aircraft.status = AircraftStatus::Landed;
                         } else if aircraft.is_localizer_captured(&ils) {
                             aircraft.heading = runway.heading as i32;
                             aircraft.on_ils = Some(ils);
+                            aircraft.status = AircraftStatus::Landing;
                         }
                     }
                 }
@@ -408,7 +458,7 @@ impl EventHandler<ggez::GameError> for Game {
             let new_speed = aircraft.speed + 10;
             self.atc.command(aircraft, ATCCommand::ChangeSpeed(new_speed));
         } else if keycode == KeyCode::L {
-            self.atc.command(aircraft, ATCCommand::ClearedToLand(!aircraft.cleared_to_land));
+            self.atc.command(aircraft, ATCCommand::ClearedToLand(!aircraft.cleared_to_land()));
         } else if keycode == KeyCode::LBracket {
             self.selected_aircraft = (self.selected_aircraft as i32 - 1).max(0) as usize;
         } else if keycode == KeyCode::RBracket {
@@ -507,7 +557,7 @@ impl EventHandler<ggez::GameError> for Game {
                 Some(Color::GREEN),
             );
 
-            if aircraft.cleared_to_land {
+            if aircraft.cleared_to_land() {
                 let text = graphics::Text::new("LND");
                 graphics::queue_text(ctx, &text, Point { x: -20.0, y: 55.0 }, Some(Color::GREEN));
             }
