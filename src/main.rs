@@ -1,4 +1,5 @@
 mod geom;
+mod tts;
 
 use ggez::{
     event::{self, EventHandler, KeyCode, MouseButton},
@@ -7,29 +8,43 @@ use ggez::{
 };
 use crate::geom::*;
 
-struct ATC;
+const TTS_ENABLED: bool = true;
+
+#[derive(Debug)]
+struct ATC {
+    tts: Option<tts::TextToSpeech>,
+}
 
 impl ATC {
-    fn command(aircraft: &mut Aircraft, cmd: ATCCommand) {
+    fn new() -> ATC {
+        ATC {
+            tts: if TTS_ENABLED {
+                Some(tts::TextToSpeech::new())
+            } else { 
+                None 
+            },
+        }
+    }
+
+    fn command(&mut self, aircraft: &mut Aircraft, cmd: ATCCommand) {
+        // request
+        println!("{}, ATC, {}", aircraft.callsign, cmd.as_string());
+        if let Some(tts) = &mut self.tts {
+            tts
+                .say(format!("{}, ATC, {}", callsign_to_name(&aircraft.callsign), cmd.as_string()))
+                .expect("failed to send tts message");
+        }
+
         use ATCCommand::*;
         match cmd {
             ChangeHeading(heading) => {
-                // request, TODO: move to ATC.command(aircraft, cmd)
-                println!("{}, ATC, heading to {}", aircraft.callsign, aircraft.heading);
                 aircraft.change_heading(heading)
                 // reply
                 // TODO
             },
-            ChangeAltitude(altitude) => {
-                println!("{}, ATC, altitude to {}", aircraft.callsign, aircraft.altitude);
-                aircraft.change_altitude(altitude)
-            },
-            ChangeSpeed(speed) => { 
-                println!("{}, ATC, speed to {}", aircraft.callsign, aircraft.speed);
-                aircraft.change_speed(speed)
-            },
+            ChangeAltitude(altitude) => aircraft.change_altitude(altitude),
+            ChangeSpeed(speed) => aircraft.change_speed(speed),
             ClearedToLand(is_cleared) => {
-                println!("{}, ATC, cleared to land", aircraft.callsign);
                 aircraft.cleared_to_land = is_cleared;
             }
         }
@@ -41,6 +56,43 @@ enum ATCCommand {
     ChangeAltitude(u32),
     ChangeSpeed(u32),
     ClearedToLand(bool),
+}
+
+impl ATCCommand {
+    fn as_string(&self) -> String {
+        use ATCCommand::*;
+        match self {
+            ChangeHeading(heading) => format!("heading to {}", heading),
+            ChangeAltitude(alt) => format!("altitude to {}", alt),
+            ChangeSpeed(speed) => format!("speed to {}", speed),
+            ClearedToLand(cleared) => 
+                String::from(if *cleared {
+                    "cleared to land"
+                } else { 
+                    "clearance to land cancelled" 
+                }),
+            
+        }
+    }
+}
+
+struct ATCRequest(ATCCommand);
+struct ATCReply(ATCCommand);
+
+// FIXME: crappy way to get callsign
+fn callsign_to_name(callsign: &String) -> String {
+    let (icao_code, flight_number) = callsign.split_at(3);
+    let spoken_callsign = 
+        match icao_code {
+            "TRA" => "Transavia",
+            "CYP" => "Cyprus Airways",
+            _other => {
+                // TODO: use phonetic alphabet
+                "unknown"
+            },
+        };
+
+    format!("{} {}", spoken_callsign, flight_number)
 }
 
 #[derive(Clone, Debug)]
@@ -229,8 +281,9 @@ impl Airport {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Game {
+    atc: ATC,
     airports: Vec<Airport>,
     selected_aircraft: usize,
     aircraft: Vec<Aircraft>,
@@ -247,6 +300,7 @@ impl Game {
         };
 
         Self {
+            atc: ATC::new(),
             airports: vec![Airport {
                 position: Point { x: 500.0, y: 550.0 },
                 icao_code: "LCPH".into(),
@@ -337,24 +391,24 @@ impl EventHandler<ggez::GameError> for Game {
 
         if keycode == KeyCode::A {
             let new_heading = aircraft.heading - 5;
-            ATC::command(aircraft, ATCCommand::ChangeHeading(new_heading));
+            self.atc.command(aircraft, ATCCommand::ChangeHeading(new_heading));
         } else if keycode == KeyCode::D {
             let new_heading = aircraft.heading + 5;
-            ATC::command(aircraft, ATCCommand::ChangeHeading(new_heading));
+            self.atc.command(aircraft, ATCCommand::ChangeHeading(new_heading));
         } else if keycode == KeyCode::S {
             let new_alt = aircraft.altitude - 1000;
-            ATC::command(aircraft, ATCCommand::ChangeAltitude(new_alt));
+            self.atc.command(aircraft, ATCCommand::ChangeAltitude(new_alt));
         } else if keycode == KeyCode::W {
             let new_alt = aircraft.altitude + 1000;
-            ATC::command(aircraft, ATCCommand::ChangeAltitude(new_alt));
+            self.atc.command(aircraft, ATCCommand::ChangeAltitude(new_alt));
         } else if keycode == KeyCode::F {
             let new_speed = aircraft.speed - 10;
-            ATC::command(aircraft, ATCCommand::ChangeSpeed(new_speed));
+            self.atc.command(aircraft, ATCCommand::ChangeSpeed(new_speed));
         } else if keycode == KeyCode::R {
             let new_speed = aircraft.speed + 10;
-            ATC::command(aircraft, ATCCommand::ChangeSpeed(new_speed));
+            self.atc.command(aircraft, ATCCommand::ChangeSpeed(new_speed));
         } else if keycode == KeyCode::L {
-            ATC::command(aircraft, ATCCommand::ClearedToLand(!aircraft.cleared_to_land));
+            self.atc.command(aircraft, ATCCommand::ClearedToLand(!aircraft.cleared_to_land));
         } else if keycode == KeyCode::LBracket {
             self.selected_aircraft = (self.selected_aircraft as i32 - 1).max(0) as usize;
         } else if keycode == KeyCode::RBracket {
