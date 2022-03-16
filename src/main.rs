@@ -1,4 +1,5 @@
 mod aircraft;
+mod cli;
 mod geom;
 mod tts;
 
@@ -9,48 +10,20 @@ use ggez::{
 };
 use crate::geom::*;
 use crate::aircraft::*;
-
-use std::sync::mpsc;
-use std::io::Write;
-
-#[derive(Debug)]
-struct CliPrompt {
-    thread: std::thread::JoinHandle<()>,
-    receiver: std::sync::mpsc::Receiver<String>,
-}
-
-impl CliPrompt {
-    pub fn new() -> Self {
-        let (tx, rx): (mpsc::Sender<String>, mpsc::Receiver<String>) = mpsc::channel();
-
-        let thread = std::thread::spawn(move || {
-            loop {
-                let mut line = String::new();
-                print!("> ");
-                std::io::stdout().flush().unwrap();
-                std::io::stdin().read_line(&mut line).expect("failed to read stdin line");
-                tx.send(line).unwrap();
-            }
-        });
-
-        Self { thread, receiver: rx, }
-    }
-
-    pub fn try_input(&self) -> Option<String> {
-        self.receiver.try_recv().ok()
-    }
-}
+use crate::cli::*;
 
 const TTS_ENABLED: bool = false;
 
 #[derive(Debug)]
 struct ATC {
+    cli: CliPrompt,
     tts: Option<tts::TextToSpeech>,
 }
 
 impl ATC {
     fn new() -> Self {
         Self {
+            cli: CliPrompt::new(),
             tts: if TTS_ENABLED {
                 Some(tts::TextToSpeech::new())
             } else { 
@@ -61,7 +34,7 @@ impl ATC {
 
     fn command(&mut self, aircraft: &mut Aircraft, cmd: ATCCommand) {
         // request
-        println!("{}, {}", aircraft.callsign, cmd.as_string());
+        self.cli.output(format!("{}, {}", aircraft.callsign, cmd.as_string()));
         if let Some(tts) = &mut self.tts {
             tts
                 .say(format!("{}, {}", aircraft.callsign.spoken(), cmd.as_string()))
@@ -103,7 +76,7 @@ impl ATCCommand {
         let mut iter = command_parts.iter();
         loop {
             let cmd = iter.next()
-                // .filter(|x| x.is_empty())
+                .filter(|x| !x.is_empty())
                 .map(|x| x.to_uppercase())
                 .map(|x| match x.as_str() {
                     "LND" => ATCCommand::ClearedToLand(true), 
@@ -156,7 +129,6 @@ const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
 #[derive(Debug)]
 struct Game {
-    cli: CliPrompt,
     atc: ATC,
     airports: Vec<Airport>,
     selected_aircraft: usize,
@@ -174,7 +146,6 @@ impl Game {
         };
 
         Self {
-            cli: CliPrompt::new(),
             atc: ATC::new(),
             airports: vec![Airport {
                 position: Point { x: 500.0, y: 550.0 },
@@ -219,7 +190,8 @@ impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         let dt = timer::delta(ctx);
 
-        if let Some(msg) = self.cli.try_input() {
+        // TODO: don't call atc.cli directly
+        if let Some(msg) = self.atc.cli.try_input() {
             for cmd in ATCCommand::from_string(msg) {
                 self.atc.command(&mut self.aircraft[self.selected_aircraft], cmd);
             }

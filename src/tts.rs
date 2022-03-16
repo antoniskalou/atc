@@ -13,15 +13,17 @@ impl TextToSpeech {
     pub fn new() -> Self {
         let (tx, rx): (Sender<String>, Receiver<String>)  = mpsc::channel();
 
-        let thread_rx = Arc::new(Mutex::new(rx));
-        let thread = thread::spawn(move || {
-            loop {
-                let msg = thread_rx
-                    .lock().unwrap()
-                    .recv().unwrap();
-                wsay(&msg).expect("wsay failed");
-            }
-        });
+        let thread = {
+            let thread_rx = Arc::new(Mutex::new(rx));
+            thread::spawn(move || {
+                loop {
+                    let msg = thread_rx
+                        .lock().unwrap()
+                        .recv().unwrap();
+                    wsay(&msg).expect("wsay failed");
+                }
+            })
+        };
         
 
         Self { thread, queue: tx, }
