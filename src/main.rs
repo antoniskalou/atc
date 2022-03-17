@@ -23,7 +23,7 @@ struct ATC {
 impl ATC {
     fn new() -> Self {
         Self {
-            cli: CliPrompt::new(),
+            cli: CliPrompt::new(String::from("ATC>")),
             tts: if TTS_ENABLED {
                 Some(tts::TextToSpeech::new())
             } else { 
@@ -34,7 +34,7 @@ impl ATC {
 
     fn command(&mut self, aircraft: &mut Aircraft, cmd: ATCCommand) {
         // request
-        self.cli.output(format!("{}, {}", aircraft.callsign, cmd.as_string()));
+        self.cli.output(format!("==> {}, {}", aircraft.callsign, cmd.as_string()));
         if let Some(tts) = &mut self.tts {
             tts
                 .say(format!("{}, {}", aircraft.callsign.spoken(), cmd.as_string()))
@@ -195,6 +195,10 @@ impl EventHandler<ggez::GameError> for Game {
             for cmd in ATCCommand::from_string(msg) {
                 self.atc.command(&mut self.aircraft[self.selected_aircraft], cmd);
             }
+
+            // FIXME: will not work correctly if called outside of if because 
+            // of the buffer being filled with Flush
+            self.atc.cli.flush();
         }
 
         for mut aircraft in &mut self.aircraft {
