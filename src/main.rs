@@ -70,7 +70,7 @@ enum ATCCommand {
 
 impl ATCCommand {
     fn from_string(s: String) -> Vec<ATCCommand> {
-        let command_parts: Vec<&str> = s.trim().split(' ').collect();
+        let command_parts: Vec<&str> = s.split(' ').collect();
     
         let mut commands = Vec::new();
         let mut iter = command_parts.iter();
@@ -196,7 +196,7 @@ impl EventHandler<ggez::GameError> for Game {
                 self.atc.command(&mut self.aircraft[self.selected_aircraft], cmd);
             }
 
-            // FIXME: will not work correctly if called outside of if because 
+            // FIXME: will not work correctly if called outside of if statement because 
             // of the buffer being filled with Flush
             self.atc.cli.flush();
         }
