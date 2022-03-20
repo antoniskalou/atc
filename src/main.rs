@@ -61,6 +61,7 @@ impl ATC {
     }
 }
 
+#[derive(Debug)]
 enum ATCCommand {
     ChangeHeading(i32),
     ChangeAltitude(u32),
@@ -192,14 +193,14 @@ impl EventHandler<ggez::GameError> for Game {
 
         // TODO: don't call atc.cli directly
         if let Some(msg) = self.atc.cli.try_input() {
+            println!("Main thread INPUT");
             for cmd in ATCCommand::from_string(msg) {
+                println!("Doing command: {:?}", cmd);
                 self.atc.command(&mut self.aircraft[self.selected_aircraft], cmd);
             }
 
-            // FIXME: will not work correctly if called outside of if statement because 
-            // of the buffer being filled with Flush
-            self.atc.cli.flush();
         }
+        self.atc.cli.flush();
 
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {
@@ -211,7 +212,6 @@ impl EventHandler<ggez::GameError> for Game {
                 aircraft.position.y += speed_change * heading.y;
             }
 
-            // TODO: check if intercepting ILS
             if aircraft.cleared_to_land() {
                 if let Some(ils) = &aircraft.on_ils {
                     let expected_alt = ils.altitude(aircraft.position);
