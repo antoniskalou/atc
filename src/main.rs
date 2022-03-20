@@ -193,12 +193,9 @@ impl EventHandler<ggez::GameError> for Game {
 
         // TODO: don't call atc.cli directly
         if let Some(msg) = self.atc.cli.try_input() {
-            println!("Main thread INPUT");
             for cmd in ATCCommand::from_string(msg) {
-                println!("Doing command: {:?}", cmd);
                 self.atc.command(&mut self.aircraft[self.selected_aircraft], cmd);
             }
-
         }
         self.atc.cli.flush();
 
