@@ -1,8 +1,7 @@
-use std::io::Write;
+use std::io::{self, BufWriter, Write};
+use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
-use std::sync::mpsc::{self, Sender, Receiver};
-use std::sync::{Arc, Condvar, Mutex, atomic::{self, AtomicBool}};
-use std::io;
 
 const CLI_HEADER: &'static str = "
 ATC Prompt
@@ -15,18 +14,13 @@ Enter commands below.
 pub struct CliPrompt {
     thread: std::thread::JoinHandle<()>,
     input: Receiver<String>,
-    output: Arc<(Mutex<io::BufWriter<io::Stdout>>, Condvar)>,
+    output: Arc<(Mutex<BufWriter<io::Stdout>>, Condvar)>,
 }
 
 impl CliPrompt {
     pub fn new(prompt_text: String) -> Self {
         let (in_tx, in_rx) = mpsc::channel();
-        let output = Arc::new(
-            (
-                Mutex::new(io::BufWriter::new(io::stdout())),
-                Condvar::new(),
-            )
-        );
+        let output = Arc::new((Mutex::new(BufWriter::new(io::stdout())), Condvar::new()));
 
         let thread = {
             let output = output.clone();
@@ -46,10 +40,10 @@ impl CliPrompt {
             })
         };
 
-        Self { 
-            thread, 
+        Self {
+            thread,
             output,
-            input: in_rx, 
+            input: in_rx,
         }
     }
 

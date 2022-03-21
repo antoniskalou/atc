@@ -55,5 +55,5 @@ pub fn heading_to_vector(heading: i32) -> Point {
 pub fn world_to_screen_coords(screen_width: f32, screen_height: f32, point: Point) -> Point {
     let x = point.x + screen_width / 2.0;
     let y = screen_height - (point.y + screen_height / 2.0);
-    Point { x, y, }
+    Point { x, y }
 }

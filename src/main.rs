@@ -3,55 +3,56 @@ mod cli;
 mod geom;
 mod tts;
 
+use crate::aircraft::*;
+use crate::cli::*;
+use crate::geom::*;
 use ggez::{
     event::{self, EventHandler, KeyCode, MouseButton},
     graphics::{self, Color},
     timer, Context, ContextBuilder, GameResult,
 };
-use crate::geom::*;
-use crate::aircraft::*;
-use crate::cli::*;
 
 const TTS_ENABLED: bool = false;
 
 #[derive(Debug)]
-struct ATC {
-    cli: CliPrompt,
+struct Atc {
     tts: Option<tts::TextToSpeech>,
 }
 
-impl ATC {
-    fn new() -> Self {
+impl Atc {
+    fn new(enable_tts: bool) -> Self {
         Self {
-            cli: CliPrompt::new(String::from("ATC>")),
-            tts: if TTS_ENABLED {
+            tts: if enable_tts {
                 Some(tts::TextToSpeech::new())
-            } else { 
-                None 
+            } else {
+                None
             },
         }
     }
 
-    fn command(&mut self, aircraft: &mut Aircraft, cmd: ATCCommand) {
+    fn command(&mut self, cli: &mut CliPrompt, aircraft: &mut Aircraft, cmd: AtcCommand) {
         // request
-        self.cli.output(format!("==> {}, {}", aircraft.callsign, cmd.as_string()));
+        cli.output(format!("==> {}, {}", aircraft.callsign, cmd.as_string()));
         if let Some(tts) = &mut self.tts {
-            tts
-                .say(format!("{}, {}", aircraft.callsign.spoken(), cmd.as_string()))
-                .expect("failed to send tts message");
+            tts.say(format!(
+                "{}, {}",
+                aircraft.callsign.spoken(),
+                cmd.as_string()
+            ))
+            .expect("failed to send tts message");
         }
 
-        use ATCCommand::*;
+        use AtcCommand::*;
         match cmd {
             ChangeHeading(heading) => {
                 aircraft.change_heading(heading)
                 // reply
                 // TODO
-            },
+            }
             ChangeAltitude(altitude) => aircraft.change_altitude(altitude),
             ChangeSpeed(speed) => aircraft.change_speed(speed),
             ClearedToLand(is_cleared) => {
-                if is_cleared { 
+                if is_cleared {
                     aircraft.status = AircraftStatus::Landing;
                 } else {
                     aircraft.status = AircraftStatus::Flight;
@@ -61,76 +62,126 @@ impl ATC {
     }
 }
 
-#[derive(Debug)]
-enum ATCCommand {
+#[derive(Clone, Debug)]
+enum AtcCommand {
     ChangeHeading(i32),
     ChangeAltitude(u32),
     ChangeSpeed(u32),
     ClearedToLand(bool),
 }
 
-impl ATCCommand {
-    fn from_string(s: String) -> Vec<ATCCommand> {
-        let command_parts: Vec<&str> = s.split(' ').collect();
-    
+impl AtcCommand {
+    fn from_parts(parts: &Vec<&str>) -> Vec<AtcCommand> {
         let mut commands = Vec::new();
-        let mut iter = command_parts.iter();
-        loop {
-            let cmd = iter.next()
-                .filter(|x| !x.is_empty())
-                .map(|x| x.to_uppercase())
-                .map(|x| match x.as_str() {
-                    "LND" => ATCCommand::ClearedToLand(true), 
-                    "HDG" => { 
-                        // TODO: error handling
-                        let hdg = iter.next().unwrap();
-                        ATCCommand::ChangeHeading(hdg.parse::<i32>().unwrap())
-                    },
-                    "ALT" => {
-                        let alt = iter.next().unwrap();
-                        ATCCommand::ChangeAltitude(alt.parse::<u32>().unwrap())
-                    },
-                    "SPD" => {
-                        let spd = iter.next().unwrap();
-                        ATCCommand::ChangeSpeed(spd.parse::<u32>().unwrap())
-                    }
-                    _ => panic!("invalid command: {}", x)
-                });
+        let mut iter = parts.iter();
+        while let Some(cmd_str) = iter.next() {
+            let cmd = match *cmd_str {
+                "LND" => Some(AtcCommand::ClearedToLand(true)),
+                "HDG" => {
+                    // TODO: error handling
+                    let hdg = iter.next().unwrap();
+                    Some(AtcCommand::ChangeHeading(hdg.parse::<i32>().unwrap()))
+                }
+                "ALT" => {
+                    let alt = iter.next().unwrap();
+                    Some(AtcCommand::ChangeAltitude(alt.parse::<u32>().unwrap()))
+                }
+                "SPD" => {
+                    let spd = iter.next().unwrap();
+                    Some(AtcCommand::ChangeSpeed(spd.parse::<u32>().unwrap()))
+                }
+                _ => None,
+            };
 
-            match cmd {
-                Some(cmd) => commands.push(cmd),
-                None => break,
+            if let Some(cmd) = cmd {
+                commands.push(cmd);
             }
         }
         commands
     }
 
     fn as_string(&self) -> String {
-        use ATCCommand::*;
+        use AtcCommand::*;
         match self {
             ChangeHeading(heading) => format!("heading to {}", heading),
             ChangeAltitude(alt) => format!("altitude to {}", alt),
             ChangeSpeed(speed) => format!("speed to {}", speed),
-            ClearedToLand(cleared) => 
-                String::from(if *cleared {
-                    "cleared to land"
-                } else { 
-                    "clearance to land cancelled" 
-                }),
-            
+            ClearedToLand(cleared) => String::from(if *cleared {
+                "cleared to land"
+            } else {
+                "clearance to land cancelled"
+            }),
         }
     }
 }
 
-struct ATCRequest(ATCCommand);
-struct ATCReply(ATCCommand);
+#[derive(Clone, Debug)]
+enum CommCommand {
+    ChangeAircraftSelection(Callsign),
+    ListAircraft,
+}
+
+impl CommCommand {
+    fn from_parts(parts: &Vec<&str>) -> Vec<CommCommand> {
+        let mut commands = Vec::new();
+        let mut iter = parts.iter();
+        while let Some(cmd_str) = iter.next() {
+            let cmd = match *cmd_str {
+                "LIST" => {
+                    // todo: add other subcommands
+                    Some(CommCommand::ListAircraft)
+                }
+                "SEL" => {
+                    let aircraft_code = iter.next().unwrap();
+                    Callsign::from_string(aircraft_code.to_string())
+                        .map(|callsign| CommCommand::ChangeAircraftSelection(callsign))
+                }
+                other => Callsign::from_string(other.to_string())
+                    .map(|callsign| CommCommand::ChangeAircraftSelection(callsign)),
+            };
+
+            if let Some(cmd) = cmd {
+                commands.push(cmd);
+            }
+        }
+        commands
+    }
+}
+
+#[derive(Clone, Debug)]
+enum CliCommand {
+    Atc(AtcCommand),
+    Comm(CommCommand),
+    // Options(OptionsCommand),
+}
+
+impl CliCommand {
+    fn from_string(s: String) -> Vec<CliCommand> {
+        let cmd_str = s.trim().to_uppercase();
+        let command_parts: Vec<&str> = cmd_str.split(' ').collect();
+        // atc commands have precedence
+        let atc_cmd = AtcCommand::from_parts(&command_parts);
+        if atc_cmd.is_empty() {
+            CommCommand::from_parts(&command_parts)
+                .iter()
+                .map(|c| CliCommand::Comm(c.clone()))
+                .collect()
+        } else {
+            atc_cmd.iter().map(|c| CliCommand::Atc(c.clone())).collect()
+        }
+    }
+}
+
+struct AtcRequest(AtcCommand);
+struct AtcReply(AtcCommand);
 
 const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
 #[derive(Debug)]
 struct Game {
-    atc: ATC,
+    atc: Atc,
+    cli: CliPrompt,
     airports: Vec<Airport>,
     selected_aircraft: usize,
     aircraft: Vec<Aircraft>,
@@ -147,7 +198,8 @@ impl Game {
         };
 
         Self {
-            atc: ATC::new(),
+            atc: Atc::new(TTS_ENABLED),
+            cli: CliPrompt::new(String::from("Atc>")),
             airports: vec![Airport {
                 position: Point { x: 500.0, y: 550.0 },
                 icao_code: "LCPH".into(),
@@ -187,17 +239,56 @@ impl Game {
     }
 }
 
+fn aircraft_by_callsign(
+    callsign: Callsign,
+    aircraft: &Vec<Aircraft>,
+) -> Option<(usize, &Aircraft)> {
+    let idx = aircraft.iter().position(|a| a.callsign == callsign);
+    idx.map(|i| (i, &aircraft[i]))
+}
+
 impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         let dt = timer::delta(ctx);
 
-        // TODO: don't call atc.cli directly
-        if let Some(msg) = self.atc.cli.try_input() {
-            for cmd in ATCCommand::from_string(msg) {
-                self.atc.command(&mut self.aircraft[self.selected_aircraft], cmd);
+        if let Some(msg) = self.cli.try_input() {
+            for cmd in CliCommand::from_string(msg) {
+                match cmd {
+                    CliCommand::Atc(atc_cmd) => {
+                        self.atc.command(
+                            &mut self.cli,
+                            &mut self.aircraft[self.selected_aircraft],
+                            atc_cmd,
+                        );
+                    }
+                    CliCommand::Comm(CommCommand::ListAircraft) => {
+                        for (idx, aircraft) in self.aircraft.iter().enumerate() {
+                            self.cli
+                                .output(format!("{}: {}", idx, aircraft.callsign.coded()));
+                        }
+                    }
+                    CliCommand::Comm(CommCommand::ChangeAircraftSelection(callsign)) => {
+                        self.cli
+                            .output(format!("Changing aircraft to {}", callsign));
+
+                        match aircraft_by_callsign(callsign.clone(), &self.aircraft) {
+                            Some((idx, aircraft)) => {
+                                self.cli
+                                    .output(format!("Now speaking to {}", aircraft.callsign));
+                                self.selected_aircraft = idx;
+                            }
+                            None => {
+                                self.cli.output(format!(
+                                    "Error: Aircraft with callsign {} doesn't exist",
+                                    callsign
+                                ));
+                            }
+                        }
+                    }
+                }
             }
         }
-        self.atc.cli.flush();
+        self.cli.flush();
 
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {

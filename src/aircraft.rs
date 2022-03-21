@@ -1,5 +1,8 @@
-use ggez::{graphics::{self, Color}, Context, GameResult};
 use crate::geom::*;
+use ggez::{
+    graphics::{self, Color},
+    Context, GameResult,
+};
 
 #[derive(Clone, Debug)]
 pub struct AircraftDefinition {
@@ -17,7 +20,7 @@ pub enum AircraftStatus {
 }
 
 // only encodes flight callsigns, not aircraft
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Callsign {
     pub name: String,
     pub code: String,
@@ -32,11 +35,33 @@ impl Callsign {
     pub fn spoken(&self) -> String {
         format!("{} {}", self.name, self.number)
     }
+
+    pub fn from_string(s: String) -> Option<Self> {
+        let s = s.to_uppercase();
+
+        if s.len() > 3 {
+            // TODO: Check number is actually valid
+            let (code, number) = s.split_at(3);
+            Some(Self {
+                name: String::from(""), // TODO: fetch from DB
+                code: code.to_string(),
+                number: number.to_string(),
+            })
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for Callsign {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.coded())
+    }
+}
+
+impl PartialEq for Callsign {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code && self.number == other.number
     }
 }
 
@@ -75,8 +100,8 @@ impl Aircraft {
     }
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {
-        is_point_in_triangle(self.position, localizer.as_triangle()) &&
-            self.altitude <= localizer.altitude(self.position)
+        is_point_in_triangle(self.position, localizer.as_triangle())
+            && self.altitude <= localizer.altitude(self.position)
     }
 
     pub fn is_grounded(&self) -> bool {
@@ -181,7 +206,10 @@ impl Runway {
             y: self.as_line(origin)[1].y,
         };
         // note, state not automatically updated
-        ILS { origin, runway: self.clone(), }
+        ILS {
+            origin,
+            runway: self.clone(),
+        }
     }
 
     // TODO
