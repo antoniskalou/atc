@@ -1,3 +1,5 @@
+use crate::atc::{AtcReply, AtcRequest};
+use crate::command::AtcCommand;
 use crate::geom::*;
 use ggez::{
     graphics::{self, Color},
@@ -111,6 +113,42 @@ impl Aircraft {
     pub fn cleared_to_land(&self) -> bool {
         self.status == AircraftStatus::Landing
     }
+
+    pub fn command(&mut self, cmd: AtcRequest) -> AtcReply {
+        use AtcCommand::*;
+        match cmd.0 {
+            ChangeHeading(heading) => {
+                self.change_heading(heading)
+                // reply
+                // TODO
+            }
+            ChangeAltitude(altitude) => self.change_altitude(altitude),
+            ChangeSpeed(speed) => self.change_speed(speed),
+            ClearedToLand(is_cleared) => {
+                if is_cleared {
+                    self.status = AircraftStatus::Landing;
+                } else {
+                    self.status = AircraftStatus::Flight;
+                }
+            }
+        }
+        AtcReply(cmd.0)
+    }
+}
+
+impl PartialEq for Aircraft {
+    fn eq(&self, other: &Self) -> bool {
+        self.callsign == other.callsign &&
+            self.position == other.position
+    }
+}
+
+pub fn aircraft_by_callsign(
+    callsign: Callsign,
+    aircraft: &Vec<Aircraft>,
+) -> Option<(usize, &Aircraft)> {
+    let idx = aircraft.iter().position(|a| a.callsign == callsign);
+    idx.map(|i| (i, &aircraft[i]))
 }
 
 pub const ILS_LENGTH: f32 = 300.0;

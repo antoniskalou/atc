@@ -1,10 +1,14 @@
 mod aircraft;
+mod atc;
 mod cli;
+mod command;
 mod geom;
 mod tts;
 
+use crate::atc::*;
 use crate::aircraft::*;
 use crate::cli::*;
+use crate::command::*;
 use crate::geom::*;
 use ggez::{
     event::{self, EventHandler, KeyCode, MouseButton},
@@ -14,167 +18,6 @@ use ggez::{
 
 const TTS_ENABLED: bool = false;
 
-#[derive(Debug)]
-struct Atc {
-    tts: Option<tts::TextToSpeech>,
-}
-
-impl Atc {
-    fn new(enable_tts: bool) -> Self {
-        Self {
-            tts: if enable_tts {
-                Some(tts::TextToSpeech::new())
-            } else {
-                None
-            },
-        }
-    }
-
-    fn command(&mut self, cli: &mut CliPrompt, aircraft: &mut Aircraft, cmd: AtcCommand) {
-        // request
-        cli.output(format!("==> {}, {}", aircraft.callsign, cmd.as_string()));
-        if let Some(tts) = &mut self.tts {
-            tts.say(format!(
-                "{}, {}",
-                aircraft.callsign.spoken(),
-                cmd.as_string()
-            ))
-            .expect("failed to send tts message");
-        }
-
-        use AtcCommand::*;
-        match cmd {
-            ChangeHeading(heading) => {
-                aircraft.change_heading(heading)
-                // reply
-                // TODO
-            }
-            ChangeAltitude(altitude) => aircraft.change_altitude(altitude),
-            ChangeSpeed(speed) => aircraft.change_speed(speed),
-            ClearedToLand(is_cleared) => {
-                if is_cleared {
-                    aircraft.status = AircraftStatus::Landing;
-                } else {
-                    aircraft.status = AircraftStatus::Flight;
-                }
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-enum AtcCommand {
-    ChangeHeading(i32),
-    ChangeAltitude(u32),
-    ChangeSpeed(u32),
-    ClearedToLand(bool),
-}
-
-impl AtcCommand {
-    fn from_parts(parts: &Vec<&str>) -> Vec<AtcCommand> {
-        let mut commands = Vec::new();
-        let mut iter = parts.iter();
-        while let Some(cmd_str) = iter.next() {
-            let cmd = match *cmd_str {
-                "LND" => Some(AtcCommand::ClearedToLand(true)),
-                "HDG" => {
-                    // TODO: error handling
-                    let hdg = iter.next().unwrap();
-                    Some(AtcCommand::ChangeHeading(hdg.parse::<i32>().unwrap()))
-                }
-                "ALT" => {
-                    let alt = iter.next().unwrap();
-                    Some(AtcCommand::ChangeAltitude(alt.parse::<u32>().unwrap()))
-                }
-                "SPD" => {
-                    let spd = iter.next().unwrap();
-                    Some(AtcCommand::ChangeSpeed(spd.parse::<u32>().unwrap()))
-                }
-                _ => None,
-            };
-
-            if let Some(cmd) = cmd {
-                commands.push(cmd);
-            }
-        }
-        commands
-    }
-
-    fn as_string(&self) -> String {
-        use AtcCommand::*;
-        match self {
-            ChangeHeading(heading) => format!("heading to {}", heading),
-            ChangeAltitude(alt) => format!("altitude to {}", alt),
-            ChangeSpeed(speed) => format!("speed to {}", speed),
-            ClearedToLand(cleared) => String::from(if *cleared {
-                "cleared to land"
-            } else {
-                "clearance to land cancelled"
-            }),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-enum CommCommand {
-    ChangeAircraftSelection(Callsign),
-    ListAircraft,
-}
-
-impl CommCommand {
-    fn from_parts(parts: &Vec<&str>) -> Vec<CommCommand> {
-        let mut commands = Vec::new();
-        let mut iter = parts.iter();
-        while let Some(cmd_str) = iter.next() {
-            let cmd = match *cmd_str {
-                "LIST" => {
-                    // todo: add other subcommands
-                    Some(CommCommand::ListAircraft)
-                }
-                "SEL" => {
-                    let aircraft_code = iter.next().unwrap();
-                    Callsign::from_string(aircraft_code.to_string())
-                        .map(|callsign| CommCommand::ChangeAircraftSelection(callsign))
-                }
-                other => Callsign::from_string(other.to_string())
-                    .map(|callsign| CommCommand::ChangeAircraftSelection(callsign)),
-            };
-
-            if let Some(cmd) = cmd {
-                commands.push(cmd);
-            }
-        }
-        commands
-    }
-}
-
-#[derive(Clone, Debug)]
-enum CliCommand {
-    Atc(AtcCommand),
-    Comm(CommCommand),
-    // Options(OptionsCommand),
-}
-
-impl CliCommand {
-    fn from_string(s: String) -> Vec<CliCommand> {
-        let cmd_str = s.trim().to_uppercase();
-        let command_parts: Vec<&str> = cmd_str.split(' ').collect();
-        // atc commands have precedence
-        let atc_cmd = AtcCommand::from_parts(&command_parts);
-        if atc_cmd.is_empty() {
-            CommCommand::from_parts(&command_parts)
-                .iter()
-                .map(|c| CliCommand::Comm(c.clone()))
-                .collect()
-        } else {
-            atc_cmd.iter().map(|c| CliCommand::Atc(c.clone())).collect()
-        }
-    }
-}
-
-struct AtcRequest(AtcCommand);
-struct AtcReply(AtcCommand);
-
 const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
@@ -183,7 +26,7 @@ struct Game {
     atc: Atc,
     cli: CliPrompt,
     airports: Vec<Airport>,
-    selected_aircraft: usize,
+    selected_aircraft: Option<usize>,
     aircraft: Vec<Aircraft>,
 }
 
@@ -206,7 +49,7 @@ impl Game {
                 takeoff_runways: vec![runway_29.clone()],
                 landing_runways: vec![runway_29.clone()],
             }],
-            selected_aircraft: 0,
+            selected_aircraft: None,
             aircraft: vec![
                 Aircraft {
                     position: ggez::mint::Point2 { x: 250.0, y: 200.0 },
@@ -239,14 +82,6 @@ impl Game {
     }
 }
 
-fn aircraft_by_callsign(
-    callsign: Callsign,
-    aircraft: &Vec<Aircraft>,
-) -> Option<(usize, &Aircraft)> {
-    let idx = aircraft.iter().position(|a| a.callsign == callsign);
-    idx.map(|i| (i, &aircraft[i]))
-}
-
 impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         let dt = timer::delta(ctx);
@@ -255,11 +90,13 @@ impl EventHandler<ggez::GameError> for Game {
             for cmd in CliCommand::from_string(msg) {
                 match cmd {
                     CliCommand::Atc(atc_cmd) => {
-                        self.atc.command(
-                            &mut self.cli,
-                            &mut self.aircraft[self.selected_aircraft],
-                            atc_cmd,
-                        );
+                        self.selected_aircraft.map(|sel| {
+                            self.atc.command(
+                                &mut self.cli,
+                                &mut self.aircraft[sel],
+                                atc_cmd,
+                            );
+                        });
                     }
                     CliCommand::Comm(CommCommand::ListAircraft) => {
                         for (idx, aircraft) in self.aircraft.iter().enumerate() {
@@ -267,7 +104,7 @@ impl EventHandler<ggez::GameError> for Game {
                                 .output(format!("{}: {}", idx, aircraft.callsign.coded()));
                         }
                     }
-                    CliCommand::Comm(CommCommand::ChangeAircraftSelection(callsign)) => {
+                    CliCommand::Comm(CommCommand::ChangeAircraft(callsign)) => {
                         self.cli
                             .output(format!("Changing aircraft to {}", callsign));
 
@@ -275,7 +112,7 @@ impl EventHandler<ggez::GameError> for Game {
                             Some((idx, aircraft)) => {
                                 self.cli
                                     .output(format!("Now speaking to {}", aircraft.callsign));
-                                self.selected_aircraft = idx;
+                                self.selected_aircraft = Some(idx);
                             }
                             None => {
                                 self.cli.output(format!(
@@ -313,7 +150,6 @@ impl EventHandler<ggez::GameError> for Game {
                         let ils = runway.ils(origin);
 
                         if runway.has_landed(origin, aircraft) {
-                            println!("Aircraft landed: {:?}", aircraft);
                             aircraft.on_ils = None;
                             aircraft.status = AircraftStatus::Landed;
                         } else if aircraft.is_localizer_captured(&ils) {
@@ -326,8 +162,21 @@ impl EventHandler<ggez::GameError> for Game {
             }
         }
 
+        let aircraft = self.aircraft.clone(); // need to clone for lifetimes
+        let old_selection = self.selected_aircraft
+                .and_then(|idx| aircraft.get(idx));
+
         // remove landed aircraft
         self.aircraft.retain(|a| !a.is_grounded());
+
+        // set to previously selected item, if exists
+        self.selected_aircraft = old_selection
+            .and_then(|old_selection| { 
+                aircraft
+                    .iter()
+                    .position(|a| a == old_selection)
+            });
+            
 
         Ok(())
     }
@@ -340,9 +189,9 @@ impl EventHandler<ggez::GameError> for Game {
         _repeat: bool,
     ) {
         if keycode == KeyCode::LBracket {
-            self.selected_aircraft = (self.selected_aircraft as i32 - 1).max(0) as usize;
+            self.selected_aircraft = Some((self.selected_aircraft.unwrap_or(0) as i32 - 1).max(0) as usize);
         } else if keycode == KeyCode::RBracket {
-            self.selected_aircraft = (self.selected_aircraft + 1).min(self.aircraft.len() - 1);
+            self.selected_aircraft = Some((self.selected_aircraft.unwrap_or(0) + 1).min(self.aircraft.len() - 1));
         }
     }
 
@@ -353,7 +202,7 @@ impl EventHandler<ggez::GameError> for Game {
 
             for (i, aircraft) in self.aircraft.iter().enumerate() {
                 if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_BOUNDING_RADIUS) {
-                    self.selected_aircraft = i;
+                    self.selected_aircraft = Some(i);
                     break;
                 }
             }
@@ -457,9 +306,10 @@ impl EventHandler<ggez::GameError> for Game {
 
         let selected_aircraft_text = graphics::Text::new(format!(
             "SELECTED: {}",
-            self.aircraft[self.selected_aircraft as usize]
-                .callsign
-                .clone()
+            self.selected_aircraft
+                .and_then(|idx| self.aircraft.get(idx))
+                .map(|a| a.callsign.coded())
+                .unwrap_or(String::from("None"))
         ));
         graphics::queue_text(
             ctx,
