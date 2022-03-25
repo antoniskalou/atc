@@ -1,5 +1,9 @@
 pub type Point = ggez::mint::Point2<f32>;
 
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
 pub fn point_distance(p1: Point, p2: Point) -> f32 {
     ((p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2)).sqrt()
 }

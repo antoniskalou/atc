@@ -72,18 +72,22 @@ pub struct Aircraft {
     pub position: Point,
     pub callsign: Callsign,
     // bearing
-    pub heading: i32,
+    pub current_heading: i32,
+    pub intended_heading: i32,
     /// feet
-    pub altitude: u32,
+    pub current_altitude: u32,
+    pub intended_altitude: u32,
     /// knots
-    pub speed: u32,
+    pub current_speed: u32,
+    pub intended_speed: u32,
+
     pub on_ils: Option<ILS>,
     pub status: AircraftStatus,
 }
 
 impl Aircraft {
     pub fn change_heading(&mut self, new_course: i32) {
-        self.heading = if new_course < 0 {
+        self.intended_heading = if new_course < 0 {
             360
         } else if new_course > 360 {
             0
@@ -93,17 +97,17 @@ impl Aircraft {
     }
 
     pub fn change_altitude(&mut self, new_altitude: u32) {
-        self.altitude = new_altitude.max(1000);
+        self.intended_altitude = new_altitude.max(1000);
     }
 
     pub fn change_speed(&mut self, new_speed: u32) {
         // TODO: depends on aircraft type
-        self.speed = new_speed.clamp(150, 250);
+        self.intended_speed = new_speed.clamp(150, 250);
     }
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {
         is_point_in_triangle(self.position, localizer.as_triangle())
-            && self.altitude <= localizer.altitude(self.position)
+            && self.current_altitude <= localizer.altitude(self.position)
     }
 
     pub fn is_grounded(&self) -> bool {
@@ -118,6 +122,7 @@ impl Aircraft {
         use AtcCommand::*;
         match cmd.0 {
             ChangeHeading(heading) => {
+                self.intended_heading = heading;
                 self.change_heading(heading)
                 // reply
                 // TODO
