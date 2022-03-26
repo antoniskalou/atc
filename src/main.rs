@@ -59,9 +59,6 @@ impl Game {
                         number: "2202".into(),
                     },
                     heading: AircraftParameter::new(90.0),
-                    current_heading: 90,
-                    intended_heading: 90,
-                    lerp_heading: None, // FIXME: move to aircraft
                     current_altitude: 6000,
                     intended_altitude: 6000,
                     current_speed: 250,
@@ -76,9 +73,7 @@ impl Game {
                         code: "TRA".into(),
                         number: "1112".into(),
                     },
-                    current_heading: 180,
-                    intended_heading: 180,
-                    lerp_heading: None,
+                    heading: AircraftParameter::new(180.0),
                     current_altitude: 12000,
                     intended_altitude: 12000,
                     current_speed: 220,
@@ -138,7 +133,14 @@ impl EventHandler<ggez::GameError> for Game {
 
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {
-                aircraft.update(dt.as_secs_f32());
+                let speed_scale = 25.0;
+                let speed_change = (aircraft.current_speed as f32 * dt.as_secs_f32()) / speed_scale;
+
+                let duration = 5.0;
+                let heading = aircraft.heading.current(duration, dt.as_secs_f32());
+                let heading = heading_to_vector(heading as i32);
+                aircraft.position.x += speed_change * heading.x;
+                aircraft.position.y += speed_change * heading.y;
             }
 
             if aircraft.cleared_to_land() {
@@ -157,7 +159,7 @@ impl EventHandler<ggez::GameError> for Game {
                             aircraft.on_ils = None;
                             aircraft.status = AircraftStatus::Landed;
                         } else if aircraft.is_localizer_captured(&ils) {
-                            aircraft.intended_heading = runway.heading as i32;
+                            aircraft.heading.change(runway.heading as f32);
                             aircraft.on_ils = Some(ils);
                             aircraft.status = AircraftStatus::Landing;
                         }
@@ -275,7 +277,7 @@ impl EventHandler<ggez::GameError> for Game {
                 Point { x: -20.0, y: 30.0 },
                 Some(Color::GREEN),
             );
-            let heading_text = graphics::Text::new(format!("H{}", aircraft.current_heading));
+            let heading_text = graphics::Text::new(format!("H{}", aircraft.heading.current as u32));
             graphics::queue_text(
                 ctx,
                 &heading_text,

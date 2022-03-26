@@ -70,7 +70,8 @@ impl PartialEq for Callsign {
 #[derive(Clone, Debug)]
 pub struct AircraftParameter {
     intended: f32,
-    current: f32,
+    // FIXME: hide
+    pub current: f32,
     lerp: Option<Lerp>,
 }
 
@@ -110,9 +111,6 @@ pub struct Aircraft {
     pub callsign: Callsign,
     // bearing
     pub heading: AircraftParameter,
-    pub current_heading: i32,
-    pub intended_heading: i32,
-    pub lerp_heading: Option<Lerp>,
     /// feet
     pub current_altitude: u32,
     pub intended_altitude: u32,
@@ -126,13 +124,14 @@ pub struct Aircraft {
 
 impl Aircraft {
     pub fn change_heading(&mut self, new_course: i32) {
-        self.intended_heading = if new_course < 0 {
+        let course = if new_course < 0 {
             360
         } else if new_course > 360 {
             0
         } else {
             new_course
         };
+        self.heading.change(course as f32);
     }
 
     pub fn change_altitude(&mut self, new_altitude: u32) {
@@ -157,37 +156,10 @@ impl Aircraft {
         self.status == AircraftStatus::Landing
     }
 
-    // TODO: make less opaque
-    pub fn update(&mut self, dt: f32) {
-        if self.current_heading != self.intended_heading {
-            if let Some(lerp) = self.lerp_heading.as_mut().filter(|x| !x.is_finished()) {
-                // FIXME: will not take the shortest turn, from 300 to 0 is left, 0 to 300 is right
-                let intended_to_current = lerp.update(dt);
-                self.current_heading = intended_to_current as i32;
-            } else {
-                let duration = 5.0;
-                let initial_diff = self.intended_heading - self.current_heading;
-                self.lerp_heading = Some(Lerp::new(
-                    self.current_heading as f32,
-                    self.intended_heading as f32,
-                    initial_diff.abs() as f32 / duration
-                ));
-                println!("Lerp created: {:?} for {}", self.lerp_heading, self.callsign);
-            }
-        }
-
-        let speed_scale = 25.0;
-        let speed_change = (self.current_speed as f32 * dt) / speed_scale;
-        let heading = heading_to_vector(self.current_heading);
-        self.position.x += speed_change * heading.x;
-        self.position.y += speed_change * heading.y;
-    }
-
     pub fn command(&mut self, cmd: AtcRequest) -> AtcReply {
         use AtcCommand::*;
         match cmd.0 {
             ChangeHeading(heading) => {
-                self.intended_heading = heading;
                 self.change_heading(heading)
                 // reply
                 // TODO
