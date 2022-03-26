@@ -68,12 +68,51 @@ impl PartialEq for Callsign {
 }
 
 #[derive(Clone, Debug)]
+pub struct AircraftParameter {
+    intended: f32,
+    current: f32,
+    lerp: Option<Lerp>,
+}
+
+impl AircraftParameter {
+    pub fn new(current: f32) -> Self {
+        Self {
+            current: current,
+            intended: current,
+            lerp: None,
+        }
+    }
+
+    pub fn change(&mut self, intended: f32) {
+        self.intended = intended;
+    }
+
+    pub fn current(&mut self, duration: f32, dt: f32) -> f32 {
+        if self.current != self.intended {
+            if let Some(lerp) = self.lerp.as_mut().filter(|x| !x.is_finished()) {
+                self.current = lerp.update(dt);
+            } else {
+                let initial_diff = self.intended - self.current;
+                self.lerp = Some(Lerp::new(
+                    self.current,
+                    self.intended,
+                    initial_diff.abs() / duration
+                ));
+            }
+        } 
+        self.current
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Aircraft {
     pub position: Point,
     pub callsign: Callsign,
     // bearing
+    pub heading: AircraftParameter,
     pub current_heading: i32,
     pub intended_heading: i32,
+    pub lerp_heading: Option<Lerp>,
     /// feet
     pub current_altitude: u32,
     pub intended_altitude: u32,
@@ -116,6 +155,32 @@ impl Aircraft {
 
     pub fn cleared_to_land(&self) -> bool {
         self.status == AircraftStatus::Landing
+    }
+
+    // TODO: make less opaque
+    pub fn update(&mut self, dt: f32) {
+        if self.current_heading != self.intended_heading {
+            if let Some(lerp) = self.lerp_heading.as_mut().filter(|x| !x.is_finished()) {
+                // FIXME: will not take the shortest turn, from 300 to 0 is left, 0 to 300 is right
+                let intended_to_current = lerp.update(dt);
+                self.current_heading = intended_to_current as i32;
+            } else {
+                let duration = 5.0;
+                let initial_diff = self.intended_heading - self.current_heading;
+                self.lerp_heading = Some(Lerp::new(
+                    self.current_heading as f32,
+                    self.intended_heading as f32,
+                    initial_diff.abs() as f32 / duration
+                ));
+                println!("Lerp created: {:?} for {}", self.lerp_heading, self.callsign);
+            }
+        }
+
+        let speed_scale = 25.0;
+        let speed_change = (self.current_speed as f32 * dt) / speed_scale;
+        let heading = heading_to_vector(self.current_heading);
+        self.position.x += speed_change * heading.x;
+        self.position.y += speed_change * heading.y;
     }
 
     pub fn command(&mut self, cmd: AtcRequest) -> AtcReply {

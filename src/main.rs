@@ -21,33 +21,6 @@ const TTS_ENABLED: bool = false;
 const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
-#[derive(Copy, Clone, Debug)]
-struct Lerp {
-    from: f32,
-    to: f32,
-    /// total duration in seconds
-    duration: f32,
-    time: f32,
-}
-
-impl Lerp {
-    fn new(from: f32, to: f32, duration: f32) -> Self {
-        Self {
-            from, to, duration, time: 0.0,
-        }
-    }
-
-    fn update(&mut self, dt: f32) -> f32 {
-        let r = lerp(self.from, self.to, self.time / self.duration);
-        self.time += dt;
-        r
-    }
-
-    fn is_finished(&self) -> bool {
-        self.time >= self.duration
-    }
-}
-
 #[derive(Debug)]
 struct Game {
     atc: Atc,
@@ -55,7 +28,6 @@ struct Game {
     airports: Vec<Airport>,
     selected_aircraft: Option<usize>,
     aircraft: Vec<Aircraft>,
-    lerp: Option<Lerp>,
 }
 
 impl Game {
@@ -69,7 +41,6 @@ impl Game {
         };
 
         Self {
-            lerp: None,
             atc: Atc::new(TTS_ENABLED),
             cli: CliPrompt::new(String::from("Atc>")),
             airports: vec![Airport {
@@ -87,8 +58,10 @@ impl Game {
                         code: "CYP".into(),
                         number: "2202".into(),
                     },
+                    heading: AircraftParameter::new(90.0),
                     current_heading: 90,
                     intended_heading: 90,
+                    lerp_heading: None, // FIXME: move to aircraft
                     current_altitude: 6000,
                     intended_altitude: 6000,
                     current_speed: 250,
@@ -105,6 +78,7 @@ impl Game {
                     },
                     current_heading: 180,
                     intended_heading: 180,
+                    lerp_heading: None,
                     current_altitude: 12000,
                     intended_altitude: 12000,
                     current_speed: 220,
@@ -164,38 +138,7 @@ impl EventHandler<ggez::GameError> for Game {
 
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {
-                let speed_scale = 25.0;
-                let speed_change = (aircraft.current_speed as f32 * dt.as_secs_f32()) / speed_scale;
-
-                let duration = 5.0; // seconds
-                if aircraft.current_heading != aircraft.intended_heading {
-                    if let Some(lerp) = self.lerp.as_mut().filter(|x| !x.is_finished()) {
-                        // FIXME: will not take the shortest turn, from 300 to 0 is left, 0 to 300 is right
-                        let intended_to_current = lerp.update(dt.as_secs_f32());
-                        aircraft.current_heading = intended_to_current as i32;
-                    } else {
-                        let initial_diff = aircraft.intended_heading - aircraft.current_heading;
-                        self.lerp = Some(Lerp::new(
-                            aircraft.current_heading as f32, 
-                            aircraft.intended_heading as f32, 
-                            initial_diff.abs() as f32 / duration
-                        ));
-                        println!("Lerp created: {:?}", self.lerp);
-                    }
-                    // let intended_to_current = lerp(
-                    //     aircraft.current_heading as f32, 
-                    //     aircraft.intended_heading as f32,
-                    //     self.time / duration
-                    // );
-                    // println!("time: {}", self.time);
-                    // aircraft.current_heading = intended_to_current as i32;
-                    // self.time += dt.as_secs_f32();
-                    // println!("Heading change: {}", intended_to_current);
-                }
-
-                let heading = heading_to_vector(aircraft.current_heading);
-                aircraft.position.x += speed_change * heading.x;
-                aircraft.position.y += speed_change * heading.y;
+                aircraft.update(dt.as_secs_f32());
             }
 
             if aircraft.cleared_to_land() {
