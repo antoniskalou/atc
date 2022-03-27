@@ -61,8 +61,21 @@ impl Game {
                     heading: AircraftParameter::new(90.0),
                     altitude: AircraftParameter::new(6000.0),
                     speed: AircraftParameter::new(240.0),
-                    on_ils: None,
                     status: AircraftStatus::Flight,
+                    cleared_to_land: false,
+                },
+                Aircraft {
+                    position: ggez::mint::Point2 { x: 800.0, y: 1000.0 },
+                    callsign: Callsign {
+                        name: "Fedex".into(),
+                        code: "FDX".into(),
+                        number: "261".into(),
+                    },
+                    heading: AircraftParameter::new(15.0),
+                    altitude: AircraftParameter::new(8000.0),
+                    speed: AircraftParameter::new(230.0),
+                    status: AircraftStatus::Flight,
+                    cleared_to_land: false,
                 },
                 Aircraft {
                     position: ggez::mint::Point2 { x: 500.0, y: 400.0 },
@@ -74,8 +87,8 @@ impl Game {
                     heading: AircraftParameter::new(180.0),
                     altitude: AircraftParameter::new(4000.0),
                     speed: AircraftParameter::new(220.0),
-                    on_ils: None,
                     status: AircraftStatus::Flight,
+                    cleared_to_land: false,
                 },
             ],
         }
@@ -141,11 +154,6 @@ impl EventHandler<ggez::GameError> for Game {
             }
 
             if aircraft.cleared_to_land() {
-                if let Some(ils) = &aircraft.on_ils {
-                    let expected_alt = ils.altitude(aircraft.position);
-                    aircraft.change_altitude(expected_alt);
-                }
-
                 // super inefficient
                 for airport in &self.airports {
                     for runway in &airport.landing_runways {
@@ -153,12 +161,13 @@ impl EventHandler<ggez::GameError> for Game {
                         let ils = runway.ils(origin);
 
                         if runway.has_landed(origin, aircraft) {
-                            aircraft.on_ils = None;
                             aircraft.status = AircraftStatus::Landed;
                         } else if aircraft.is_localizer_captured(&ils) {
-                            aircraft.change_heading(runway.heading as i32);
-                            aircraft.on_ils = Some(ils);
                             aircraft.status = AircraftStatus::Landing;
+                            aircraft.change_heading(runway.heading as i32);
+
+                            let expected_alt = ils.altitude(aircraft.position);
+                            aircraft.change_altitude(expected_alt);
                         }
                     }
                 }
@@ -298,7 +307,7 @@ impl EventHandler<ggez::GameError> for Game {
                 graphics::queue_text(ctx, &text, Point { x: -20.0, y: 55.0 }, Some(Color::GREEN));
             }
 
-            if aircraft.on_ils.is_some() {
+            if aircraft.status == AircraftStatus::Landing {
                 let text = graphics::Text::new("LOC");
                 graphics::queue_text(ctx, &text, Point { x: 20.0, y: 55.0 }, Some(Color::GREEN));
             }
@@ -338,7 +347,7 @@ impl EventHandler<ggez::GameError> for Game {
 fn main() {
     let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
         .window_setup(ggez::conf::WindowSetup::default().title("ATC Simulator 2022"))
-        .window_mode(ggez::conf::WindowMode::default().dimensions(1280.0, 960.0))
+        .window_mode(ggez::conf::WindowMode::default().dimensions(1600.0, 1200.0))
         .build()
         .expect("Could not create ggez context");
 

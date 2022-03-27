@@ -115,8 +115,8 @@ pub struct Aircraft {
     pub altitude: AircraftParameter,
     /// knots
     pub speed: AircraftParameter,
-    pub on_ils: Option<ILS>,
     pub status: AircraftStatus,
+    pub cleared_to_land: bool,
 }
 
 impl Aircraft {
@@ -156,7 +156,7 @@ impl Aircraft {
     }
 
     pub fn cleared_to_land(&self) -> bool {
-        self.status == AircraftStatus::Landing
+        self.cleared_to_land
     }
 
     pub fn command(&mut self, cmd: AtcRequest) -> AtcReply {
@@ -170,11 +170,7 @@ impl Aircraft {
             ChangeAltitude(altitude) => self.change_altitude(altitude),
             ChangeSpeed(speed) => self.change_speed(speed),
             ClearedToLand(is_cleared) => {
-                if is_cleared {
-                    self.status = AircraftStatus::Landing;
-                } else {
-                    self.status = AircraftStatus::Flight;
-                }
+                self.cleared_to_land = is_cleared;
             }
         }
         AtcReply(cmd.0)
@@ -196,7 +192,7 @@ pub fn aircraft_by_callsign(
     idx.map(|i| (i, &aircraft[i]))
 }
 
-pub const ILS_LENGTH: f32 = 300.0;
+pub const ILS_LENGTH: f32 = 500.0;
 
 #[derive(Clone, Debug)]
 pub struct ILS {
@@ -216,7 +212,7 @@ impl ILS {
                     x: self.origin.x,
                     y: self.origin.y + ILS_LENGTH,
                 },
-                -3f32.to_radians(),
+                3f32.to_radians(),
             ),
             rotate_point(
                 self.origin,
@@ -224,7 +220,7 @@ impl ILS {
                     x: self.origin.x,
                     y: self.origin.y + ILS_LENGTH,
                 },
-                3f32.to_radians(),
+                -3f32.to_radians(),
             ),
         ];
 
