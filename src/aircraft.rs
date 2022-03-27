@@ -84,11 +84,14 @@ impl AircraftParameter {
         }
     }
 
-    pub fn change(&mut self, intended: f32) {
+    fn change(&mut self, intended: f32) {
         self.intended = intended;
+        self.lerp = None;
     }
 
+    /// duration is time per single value
     pub fn current(&mut self, duration: f32, dt: f32) -> f32 {
+        // FIXME: don't use != assumption for finished
         if self.current != self.intended {
             if let Some(lerp) = self.lerp.as_mut().filter(|x| !x.is_finished()) {
                 self.current = lerp.update(dt);
@@ -97,7 +100,7 @@ impl AircraftParameter {
                 self.lerp = Some(Lerp::new(
                     self.current,
                     self.intended,
-                    initial_diff.abs() / duration
+                    initial_diff.abs() * duration
                 ));
             }
         } 
@@ -109,15 +112,13 @@ impl AircraftParameter {
 pub struct Aircraft {
     pub position: Point,
     pub callsign: Callsign,
-    // bearing
+    /// bearing
+    // FIXME: need to call current to continue, its opaque to caller
     pub heading: AircraftParameter,
     /// feet
-    pub current_altitude: u32,
-    pub intended_altitude: u32,
+    pub altitude: AircraftParameter,
     /// knots
-    pub current_speed: u32,
-    pub intended_speed: u32,
-
+    pub speed: AircraftParameter,
     pub on_ils: Option<ILS>,
     pub status: AircraftStatus,
 }
@@ -135,17 +136,17 @@ impl Aircraft {
     }
 
     pub fn change_altitude(&mut self, new_altitude: u32) {
-        self.intended_altitude = new_altitude.max(1000);
+        self.altitude.change(new_altitude as f32);
     }
 
     pub fn change_speed(&mut self, new_speed: u32) {
         // TODO: depends on aircraft type
-        self.intended_speed = new_speed.clamp(150, 250);
+        self.speed.change(new_speed.clamp(150, 250) as f32);
     }
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {
         is_point_in_triangle(self.position, localizer.as_triangle())
-            && self.current_altitude <= localizer.altitude(self.position)
+            && self.altitude.current as u32 <= localizer.altitude(self.position)
     }
 
     pub fn is_grounded(&self) -> bool {

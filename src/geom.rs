@@ -9,6 +9,7 @@ pub struct Lerp {
     from: f32,
     to: f32,
     /// total duration in seconds
+    // FIXME: doesn't match seconds
     duration: f32,
     time: f32,
 }

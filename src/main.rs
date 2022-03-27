@@ -59,10 +59,8 @@ impl Game {
                         number: "2202".into(),
                     },
                     heading: AircraftParameter::new(90.0),
-                    current_altitude: 6000,
-                    intended_altitude: 6000,
-                    current_speed: 250,
-                    intended_speed: 250,
+                    altitude: AircraftParameter::new(6000.0),
+                    speed: AircraftParameter::new(240.0),
                     on_ils: None,
                     status: AircraftStatus::Flight,
                 },
@@ -74,10 +72,8 @@ impl Game {
                         number: "1112".into(),
                     },
                     heading: AircraftParameter::new(180.0),
-                    current_altitude: 12000,
-                    intended_altitude: 12000,
-                    current_speed: 220,
-                    intended_speed: 220,
+                    altitude: AircraftParameter::new(4000.0),
+                    speed: AircraftParameter::new(220.0),
                     on_ils: None,
                     status: AircraftStatus::Flight,
                 },
@@ -88,7 +84,7 @@ impl Game {
 
 impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
-        let dt = timer::delta(ctx);
+        let dt = timer::delta(ctx).as_secs_f32();
 
         if let Some(msg) = self.cli.try_input() {
             for cmd in CliCommand::from_string(msg) {
@@ -133,20 +129,27 @@ impl EventHandler<ggez::GameError> for Game {
 
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {
-                let speed_scale = 25.0;
-                let speed_change = (aircraft.current_speed as f32 * dt.as_secs_f32()) / speed_scale;
+                let speed_scale = 50.0;
+                // time for 1kt change
+                let duration = 1.0;
+                let speed_change = (aircraft.speed.current(duration, dt) * dt) / speed_scale;
 
-                let duration = 5.0;
-                let heading = aircraft.heading.current(duration, dt.as_secs_f32());
+                // time for 1 degree change
+                let duration = 0.1;
+                let heading = aircraft.heading.current(duration, dt);
                 let heading = heading_to_vector(heading as i32);
                 aircraft.position.x += speed_change * heading.x;
                 aircraft.position.y += speed_change * heading.y;
+
+                // seconds per 1000 feet
+                let duration = 30.0 / 1000.0;
+                let _alt = aircraft.altitude.current(duration, dt);
             }
 
             if aircraft.cleared_to_land() {
                 if let Some(ils) = &aircraft.on_ils {
                     let expected_alt = ils.altitude(aircraft.position);
-                    aircraft.intended_altitude = expected_alt;
+                    aircraft.change_altitude(expected_alt);
                 }
 
                 // super inefficient
@@ -159,7 +162,7 @@ impl EventHandler<ggez::GameError> for Game {
                             aircraft.on_ils = None;
                             aircraft.status = AircraftStatus::Landed;
                         } else if aircraft.is_localizer_captured(&ils) {
-                            aircraft.heading.change(runway.heading as f32);
+                            aircraft.change_heading(runway.heading as i32);
                             aircraft.on_ils = Some(ils);
                             aircraft.status = AircraftStatus::Landing;
                         }
@@ -277,14 +280,18 @@ impl EventHandler<ggez::GameError> for Game {
                 Point { x: -20.0, y: 30.0 },
                 Some(Color::GREEN),
             );
-            let heading_text = graphics::Text::new(format!("H{}", aircraft.heading.current as u32));
+            let heading_text = graphics::Text::new(format!("H{}", aircraft.heading.current.round()));
             graphics::queue_text(
                 ctx,
                 &heading_text,
                 Point { x: -20.0, y: 45.0 },
                 Some(Color::GREEN),
             );
-            let altitude_text = graphics::Text::new(format!("{}", aircraft.current_altitude));
+            let altitude_text = {
+                // alt to FL
+                let alt = (aircraft.altitude.current / 100.0).round();
+                graphics::Text::new(format!("FL{}", alt as u32))
+            };
             graphics::queue_text(
                 ctx,
                 &altitude_text,
