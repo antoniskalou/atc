@@ -84,25 +84,21 @@ impl AircraftParameter {
         }
     }
 
-    fn change(&mut self, intended: f32) {
+    /// duration is time per single value
+    fn change(&mut self, intended: f32, duration: f32) {
         self.intended = intended;
-        self.lerp = None;
+
+        let initial_diff = self.intended - self.current;
+        self.lerp = Some(Lerp::new(
+            self.current,
+            self.intended,
+            initial_diff.abs() * duration
+        ));
     }
 
-    /// duration is time per single value
-    pub fn current(&mut self, duration: f32, dt: f32) -> f32 {
-        // FIXME: don't use != assumption for finished
-        if self.current != self.intended {
-            if let Some(lerp) = self.lerp.as_mut().filter(|x| !x.is_finished()) {
-                self.current = lerp.update(dt);
-            } else {
-                let initial_diff = self.intended - self.current;
-                self.lerp = Some(Lerp::new(
-                    self.current,
-                    self.intended,
-                    initial_diff.abs() * duration
-                ));
-            }
+    pub fn current(&mut self, dt: f32) -> f32 {
+        if let Some(lerp) = self.lerp.as_mut().filter(|x| !x.is_finished()) {
+            self.current = lerp.update(dt);
         } 
         self.current
     }
@@ -125,6 +121,8 @@ pub struct Aircraft {
 
 impl Aircraft {
     pub fn change_heading(&mut self, new_course: i32) {
+        // time for 1 degree change
+        let duration = 0.1;
         let course = if new_course < 0 {
             360
         } else if new_course > 360 {
@@ -132,16 +130,20 @@ impl Aircraft {
         } else {
             new_course
         };
-        self.heading.change(course as f32);
+        self.heading.change(course as f32, duration);
     }
 
     pub fn change_altitude(&mut self, new_altitude: u32) {
-        self.altitude.change(new_altitude as f32);
+        // seconds per 1000 feet
+        let duration = 30.0 / 1000.0;
+        self.altitude.change(new_altitude as f32, duration);
     }
 
     pub fn change_speed(&mut self, new_speed: u32) {
+        // time for 1kt change
+        let duration = 1.0;
         // TODO: depends on aircraft type
-        self.speed.change(new_speed.clamp(150, 250) as f32);
+        self.speed.change(new_speed.clamp(150, 250) as f32, duration);
     }
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {

@@ -41,8 +41,9 @@ impl AtcCommand {
     pub fn as_string(&self) -> String {
         use AtcCommand::*;
         match self {
+            // for tts its better to print heading to 1 8 0 for example
             ChangeHeading(heading) => format!("heading to {}", heading),
-            ChangeAltitude(alt) => format!("altitude to {}", alt),
+            ChangeAltitude(alt) => format!("altitude to {} feet", alt),
             ChangeSpeed(speed) => format!("speed to {}", speed),
             ClearedToLand(cleared) => String::from(if *cleared {
                 "cleared to land"

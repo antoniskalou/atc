@@ -130,20 +130,14 @@ impl EventHandler<ggez::GameError> for Game {
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {
                 let speed_scale = 50.0;
-                // time for 1kt change
-                let duration = 1.0;
-                let speed_change = (aircraft.speed.current(duration, dt) * dt) / speed_scale;
+                let speed_change = (aircraft.speed.current(dt) * dt) / speed_scale;
 
-                // time for 1 degree change
-                let duration = 0.1;
-                let heading = aircraft.heading.current(duration, dt);
+                let heading = aircraft.heading.current(dt);
                 let heading = heading_to_vector(heading as i32);
                 aircraft.position.x += speed_change * heading.x;
                 aircraft.position.y += speed_change * heading.y;
 
-                // seconds per 1000 feet
-                let duration = 30.0 / 1000.0;
-                let _alt = aircraft.altitude.current(duration, dt);
+                let _alt = aircraft.altitude.current(dt);
             }
 
             if aircraft.cleared_to_land() {
