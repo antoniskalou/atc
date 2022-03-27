@@ -86,14 +86,16 @@ impl AircraftParameter {
 
     /// duration is time per single value
     fn change(&mut self, intended: f32, duration: f32) {
-        self.intended = intended;
+        if self.intended != intended {
+            self.intended = intended;
 
-        let initial_diff = self.intended - self.current;
-        self.lerp = Some(Lerp::new(
-            self.current,
-            self.intended,
-            initial_diff.abs() * duration
-        ));
+            let initial_diff = self.intended - self.current;
+            self.lerp = Some(Lerp::new(
+                self.current,
+                self.intended,
+                initial_diff.abs() * duration
+            ));
+        }
     }
 
     pub fn current(&mut self, dt: f32) -> f32 {
