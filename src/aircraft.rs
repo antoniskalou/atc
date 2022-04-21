@@ -1,6 +1,7 @@
 use crate::atc::{AtcReply, AtcRequest};
 use crate::command::AtcCommand;
 use crate::geom::*;
+use crate::math::*;
 use ggez::{
     graphics::{self, Color},
     Context, GameResult,
@@ -73,6 +74,8 @@ pub struct AircraftParameter {
     // FIXME: hide
     pub current: f32,
     lerp: Option<Lerp>,
+    // FIXME: lerp_fn needs to be stored twice
+    lerp_fn: Option<LerpFn>,
 }
 
 impl AircraftParameter {
@@ -81,7 +84,14 @@ impl AircraftParameter {
             current: current,
             intended: current,
             lerp: None,
+            lerp_fn: None,
         }
+    }
+
+    pub fn with_lerp(current: f32, lerp: LerpFn) -> Self {
+        let mut param = Self::new(current);
+        param.lerp_fn = Some(lerp);
+        param
     }
 
     /// duration is time per single value
@@ -90,18 +100,18 @@ impl AircraftParameter {
             self.intended = intended;
 
             let initial_diff = self.intended - self.current;
-            self.lerp = Some(Lerp::new(
-                self.current,
-                self.intended,
-                initial_diff.abs() * duration
-            ));
+            let duration = initial_diff.abs() * duration;
+            self.lerp = self
+                .lerp_fn
+                .map(|f| Lerp::with_lerp(self.current, self.intended, duration, f))
+                .or(Some(Lerp::new(self.current, self.intended, duration)));
         }
     }
 
     pub fn current(&mut self, dt: f32) -> f32 {
         if let Some(lerp) = self.lerp.as_mut().filter(|x| !x.is_finished()) {
             self.current = lerp.update(dt);
-        } 
+        }
         self.current
     }
 }
@@ -122,16 +132,12 @@ pub struct Aircraft {
 }
 
 impl Aircraft {
-    pub fn change_heading(&mut self, new_course: i32) {
+    pub fn change_heading(&mut self, course: i32) {
         // time for 1 degree change
         let duration = 0.1;
-        let course = if new_course < 0 {
-            360
-        } else if new_course > 360 {
-            0
-        } else {
-            new_course
-        };
+        let course = clamp(course, 0, 360);
+        // let reverse_turn = (course as f32 - self.heading.current).abs() > 180.0;
+        // let course = if reverse_turn { course + 360 } else { course };
         self.heading.change(course as f32, duration);
     }
 
@@ -145,7 +151,8 @@ impl Aircraft {
         // time for 1kt change
         let duration = 1.0;
         // TODO: depends on aircraft type
-        self.speed.change(new_speed.clamp(150, 250) as f32, duration);
+        self.speed
+            .change(new_speed.clamp(150, 250) as f32, duration);
     }
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {
@@ -181,8 +188,7 @@ impl Aircraft {
 
 impl PartialEq for Aircraft {
     fn eq(&self, other: &Self) -> bool {
-        self.callsign == other.callsign &&
-            self.position == other.position
+        self.callsign == other.callsign && self.position == other.position
     }
 }
 

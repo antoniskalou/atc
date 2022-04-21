@@ -3,10 +3,11 @@ mod atc;
 mod cli;
 mod command;
 mod geom;
+mod math;
 mod tts;
 
-use crate::atc::*;
 use crate::aircraft::*;
+use crate::atc::*;
 use crate::cli::*;
 use crate::command::*;
 use crate::geom::*;
@@ -16,7 +17,7 @@ use ggez::{
     timer, Context, ContextBuilder, GameResult,
 };
 
-const TTS_ENABLED: bool = false;
+const TTS_ENABLED: bool = true;
 
 const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
@@ -42,7 +43,7 @@ impl Game {
 
         Self {
             atc: Atc::new(TTS_ENABLED),
-            cli: CliPrompt::new(String::from("Atc>")),
+            cli: CliPrompt::new(String::from("ATC>")),
             airports: vec![Airport {
                 position: Point { x: 500.0, y: 550.0 },
                 icao_code: "LCPH".into(),
@@ -58,20 +59,25 @@ impl Game {
                         code: "CYP".into(),
                         number: "2202".into(),
                     },
-                    heading: AircraftParameter::new(90.0),
+                    // heading: AircraftParameter::new(90.0),
+                    // FIXME
+                    heading: AircraftParameter::with_lerp(90.0, crate::math::angle_lerp),
                     altitude: AircraftParameter::new(6000.0),
                     speed: AircraftParameter::new(240.0),
                     status: AircraftStatus::Flight,
                     cleared_to_land: false,
                 },
                 Aircraft {
-                    position: ggez::mint::Point2 { x: 800.0, y: 1000.0 },
+                    position: ggez::mint::Point2 {
+                        x: 800.0,
+                        y: 1000.0,
+                    },
                     callsign: Callsign {
                         name: "Fedex".into(),
                         code: "FDX".into(),
                         number: "261".into(),
                     },
-                    heading: AircraftParameter::new(15.0),
+                    heading: AircraftParameter::with_lerp(15.0, crate::math::angle_lerp),
                     altitude: AircraftParameter::new(8000.0),
                     speed: AircraftParameter::new(230.0),
                     status: AircraftStatus::Flight,
@@ -84,7 +90,7 @@ impl Game {
                         code: "TRA".into(),
                         number: "1112".into(),
                     },
-                    heading: AircraftParameter::new(180.0),
+                    heading: AircraftParameter::with_lerp(180.0, crate::math::angle_lerp),
                     altitude: AircraftParameter::new(4000.0),
                     speed: AircraftParameter::new(220.0),
                     status: AircraftStatus::Flight,
@@ -104,11 +110,8 @@ impl EventHandler<ggez::GameError> for Game {
                 match cmd {
                     CliCommand::Atc(atc_cmd) => {
                         self.selected_aircraft.map(|sel| {
-                            self.atc.command(
-                                &mut self.cli,
-                                &mut self.aircraft[sel],
-                                atc_cmd,
-                            );
+                            self.atc
+                                .command(&mut self.cli, &mut self.aircraft[sel], atc_cmd);
                         });
                     }
                     CliCommand::Comm(CommCommand::ListAircraft) => {
@@ -175,20 +178,14 @@ impl EventHandler<ggez::GameError> for Game {
         }
 
         let aircraft = self.aircraft.clone(); // need to clone for lifetimes
-        let old_selection = self.selected_aircraft
-                .and_then(|idx| aircraft.get(idx));
+        let old_selection = self.selected_aircraft.and_then(|idx| aircraft.get(idx));
 
         // remove landed aircraft
         self.aircraft.retain(|a| !a.is_grounded());
 
         // set to previously selected item, if exists
         self.selected_aircraft = old_selection
-            .and_then(|old_selection| { 
-                aircraft
-                    .iter()
-                    .position(|a| a == old_selection)
-            });
-            
+            .and_then(|old_selection| aircraft.iter().position(|a| a == old_selection));
 
         Ok(())
     }
@@ -201,9 +198,11 @@ impl EventHandler<ggez::GameError> for Game {
         _repeat: bool,
     ) {
         if keycode == KeyCode::LBracket {
-            self.selected_aircraft = Some((self.selected_aircraft.unwrap_or(0) as i32 - 1).max(0) as usize);
+            self.selected_aircraft =
+                Some((self.selected_aircraft.unwrap_or(0) as i32 - 1).max(0) as usize);
         } else if keycode == KeyCode::RBracket {
-            self.selected_aircraft = Some((self.selected_aircraft.unwrap_or(0) + 1).min(self.aircraft.len() - 1));
+            self.selected_aircraft =
+                Some((self.selected_aircraft.unwrap_or(0) + 1).min(self.aircraft.len() - 1));
         }
     }
 
@@ -283,7 +282,8 @@ impl EventHandler<ggez::GameError> for Game {
                 Point { x: -20.0, y: 30.0 },
                 Some(Color::GREEN),
             );
-            let heading_text = graphics::Text::new(format!("H{}", aircraft.heading.current.round()));
+            let heading_text =
+                graphics::Text::new(format!("H{}", aircraft.heading.current.round()));
             graphics::queue_text(
                 ctx,
                 &heading_text,

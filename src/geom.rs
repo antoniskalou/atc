@@ -1,37 +1,5 @@
 pub type Point = ggez::mint::Point2<f32>;
 
-pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Lerp {
-    from: f32,
-    to: f32,
-    /// total duration in seconds
-    // FIXME: doesn't match seconds
-    duration: f32,
-    time: f32,
-}
-
-impl Lerp {
-    pub fn new(from: f32, to: f32, duration: f32) -> Self {
-        Self {
-            from, to, duration, time: 0.0,
-        }
-    }
-
-    pub fn update(&mut self, dt: f32) -> f32 {
-        let r = lerp(self.from, self.to, self.time / self.duration);
-        self.time += dt;
-        r
-    }
-
-    pub fn is_finished(&self) -> bool {
-        self.time >= self.duration
-    }
-}
-
 pub fn point_distance(p1: Point, p2: Point) -> f32 {
     ((p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2)).sqrt()
 }
