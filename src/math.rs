@@ -13,11 +13,15 @@ where
     }
 }
 
-/// uses radians
+/// See https://stackoverflow.com/a/28037434
 pub fn short_angle_distance(a: f32, b: f32) -> f32 {
-    let max = std::f32::consts::PI;
-    let da = (b - a) % max;
-    2.0 * da % max - da
+    let diff = (b - a + 180.0) % 360.0 - 180.0;
+    let dist = if diff < -180.0 {
+        diff + 360.0
+    } else {
+        diff
+    };
+    dist.abs()
 }
 
 fn repeat(t: f32, m: f32) -> f32 {
@@ -26,6 +30,8 @@ fn repeat(t: f32, m: f32) -> f32 {
 
 /// return the shortest distance between 2 angles
 /// E.g. 350 to 0 will return 10 instead of 350
+/// 
+/// See https://gist.github.com/shaunlebron/8832585?permalink_comment_id=3227412#gistcomment-3227412
 pub fn angle_lerp(a: f32, b: f32, t: f32) -> f32 {
     let dt = repeat(b - a, 360.0);
     let lerp = lerp(a, a + if dt > 180.0 { dt - 360.0 } else { dt }, t) % 360.0;
@@ -82,6 +88,15 @@ impl Interpolator {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_short_angle_distance() {
+        assert_eq!(20.0, short_angle_distance(350.0, 10.0));
+        assert_eq!(20.0, short_angle_distance(10.0, 350.0));
+        assert_eq!(180.0, short_angle_distance(90.0, 270.0));
+        assert_eq!(180.0, short_angle_distance(270.0, 90.0));
+    }
+
 
     #[test]
     fn test_clamp() {

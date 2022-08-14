@@ -68,29 +68,11 @@ impl PartialEq for Callsign {
     }
 }
 
-// #[derive(Debug, PartialEq)]
-// pub enum TurnDirection {
-//     Left,
-//     Right,
-// }
-
-// impl TurnDirection {
-//     fn from_distance(a: f32, b: f32) -> Self {
-//         if b - a > 180.0 || b - a < 0.0 {
-//             TurnDirection::Left
-//         } else {
-//             TurnDirection::Right
-//         }
-//     }
-// }
-
-// #[test]
-// fn test_turn_direction_from_distance() {
-//     assert_eq!(TurnDirection::from_distance(0.0, 270.0), TurnDirection::Left);
-//     assert_eq!(TurnDirection::from_distance(90.0, 10.0), TurnDirection::Left);
-//     assert_eq!(TurnDirection::from_distance(0.0, 90.0), TurnDirection::Right);
-//     assert_eq!(TurnDirection::from_distance(270.0, 30.0), TurnDirection::Right);
-// }
+#[derive(Debug, PartialEq)]
+pub enum TurnDirection {
+    Left,
+    Right,
+}
 
 #[derive(Clone, Debug)]
 pub struct HeadingParameter {
@@ -113,9 +95,8 @@ impl HeadingParameter {
         if self.intended != intended {
             self.intended = intended;
 
-            // let initial_diff = short_angle_distance(self.intended.to_radians(), self.current.to_radians());
-            let initial_diff = self.intended - self.current;
-            let duration = initial_diff.abs() * duration;
+            let initial_diff = short_angle_distance(self.intended, self.current);
+            let duration = initial_diff * duration;
             self.interpolator = Some(Interpolator::with_fn(
                 self.current, self.intended, duration, angle_lerp,
             ));
@@ -187,8 +168,6 @@ impl Aircraft {
         // time for 1 degree change
         let duration = 0.1;
         let course = clamp(course, 0, 360);
-        // let reverse_turn = (course as f32 - self.heading.current).abs() > 180.0;
-        // let course = if reverse_turn { course + 360 } else { course };
         self.heading.change(course as f32, duration);
     }
 
