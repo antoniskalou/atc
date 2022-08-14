@@ -68,14 +68,74 @@ impl PartialEq for Callsign {
     }
 }
 
+// #[derive(Debug, PartialEq)]
+// pub enum TurnDirection {
+//     Left,
+//     Right,
+// }
+
+// impl TurnDirection {
+//     fn from_distance(a: f32, b: f32) -> Self {
+//         if b - a > 180.0 || b - a < 0.0 {
+//             TurnDirection::Left
+//         } else {
+//             TurnDirection::Right
+//         }
+//     }
+// }
+
+// #[test]
+// fn test_turn_direction_from_distance() {
+//     assert_eq!(TurnDirection::from_distance(0.0, 270.0), TurnDirection::Left);
+//     assert_eq!(TurnDirection::from_distance(90.0, 10.0), TurnDirection::Left);
+//     assert_eq!(TurnDirection::from_distance(0.0, 90.0), TurnDirection::Right);
+//     assert_eq!(TurnDirection::from_distance(270.0, 30.0), TurnDirection::Right);
+// }
+
+#[derive(Clone, Debug)]
+pub struct HeadingParameter {
+    intended: f32,
+    // FIXME: hide
+    pub current: f32,
+    interpolator: Option<Interpolator>,
+}
+
+impl HeadingParameter {
+    pub fn new(current: f32) -> Self {
+        Self {
+            current,
+            intended: current,
+            interpolator: None,
+        }
+    }
+
+    fn change(&mut self, intended: f32, duration: f32) {
+        if self.intended != intended {
+            self.intended = intended;
+
+            // let initial_diff = short_angle_distance(self.intended.to_radians(), self.current.to_radians());
+            let initial_diff = self.intended - self.current;
+            let duration = initial_diff.abs() * duration;
+            self.interpolator = Some(Interpolator::with_fn(
+                self.current, self.intended, duration, angle_lerp,
+            ));
+        }
+    }
+
+    pub fn current(&mut self, dt: f32) -> f32 {
+        if let Some(interpolator) = self.interpolator.as_mut().filter(|x| !x.is_finished()) {
+            self.current = interpolator.update(dt);
+        }
+        self.current
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct AircraftParameter {
     intended: f32,
     // FIXME: hide
     pub current: f32,
-    lerp: Option<Lerp>,
-    // FIXME: lerp_fn needs to be stored twice
-    lerp_fn: Option<LerpFn>,
+    interpolator: Option<Interpolator>,
 }
 
 impl AircraftParameter {
@@ -83,15 +143,8 @@ impl AircraftParameter {
         Self {
             current: current,
             intended: current,
-            lerp: None,
-            lerp_fn: None,
+            interpolator: None,
         }
-    }
-
-    pub fn with_lerp(current: f32, lerp: LerpFn) -> Self {
-        let mut param = Self::new(current);
-        param.lerp_fn = Some(lerp);
-        param
     }
 
     /// duration is time per single value
@@ -100,17 +153,15 @@ impl AircraftParameter {
             self.intended = intended;
 
             let initial_diff = self.intended - self.current;
+            // let initial_diff = short_angle_distance(self.intended, self.current);
             let duration = initial_diff.abs() * duration;
-            self.lerp = self
-                .lerp_fn
-                .map(|f| Lerp::with_lerp(self.current, self.intended, duration, f))
-                .or(Some(Lerp::new(self.current, self.intended, duration)));
+            self.interpolator = Some(Interpolator::new(self.current, self.intended, duration));
         }
     }
 
     pub fn current(&mut self, dt: f32) -> f32 {
-        if let Some(lerp) = self.lerp.as_mut().filter(|x| !x.is_finished()) {
-            self.current = lerp.update(dt);
+        if let Some(interpolator) = self.interpolator.as_mut().filter(|x| !x.is_finished()) {
+            self.current = interpolator.update(dt);
         }
         self.current
     }
@@ -122,7 +173,7 @@ pub struct Aircraft {
     pub callsign: Callsign,
     /// bearing
     // FIXME: need to call current to continue, its opaque to caller
-    pub heading: AircraftParameter,
+    pub heading: HeadingParameter,
     /// feet
     pub altitude: AircraftParameter,
     /// knots

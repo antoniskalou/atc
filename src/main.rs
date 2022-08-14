@@ -17,7 +17,7 @@ use ggez::{
     timer, Context, ContextBuilder, GameResult,
 };
 
-const TTS_ENABLED: bool = true;
+const TTS_ENABLED: bool = false;
 
 const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
@@ -61,7 +61,7 @@ impl Game {
                     },
                     // heading: AircraftParameter::new(90.0),
                     // FIXME
-                    heading: AircraftParameter::with_lerp(90.0, crate::math::angle_lerp),
+                    heading: HeadingParameter::new(90.0),
                     altitude: AircraftParameter::new(6000.0),
                     speed: AircraftParameter::new(240.0),
                     status: AircraftStatus::Flight,
@@ -77,7 +77,7 @@ impl Game {
                         code: "FDX".into(),
                         number: "261".into(),
                     },
-                    heading: AircraftParameter::with_lerp(15.0, crate::math::angle_lerp),
+                    heading: HeadingParameter::new(15.0),
                     altitude: AircraftParameter::new(8000.0),
                     speed: AircraftParameter::new(230.0),
                     status: AircraftStatus::Flight,
@@ -90,7 +90,7 @@ impl Game {
                         code: "TRA".into(),
                         number: "1112".into(),
                     },
-                    heading: AircraftParameter::with_lerp(180.0, crate::math::angle_lerp),
+                    heading: HeadingParameter::new(180.0),
                     altitude: AircraftParameter::new(4000.0),
                     speed: AircraftParameter::new(220.0),
                     status: AircraftStatus::Flight,
