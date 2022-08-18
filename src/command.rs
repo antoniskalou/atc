@@ -1,8 +1,9 @@
-use crate::aircraft::Callsign;
+use crate::aircraft::{Callsign, TurnDirection};
 
 #[derive(Clone, Debug)]
 pub enum AtcCommand {
     ChangeHeading(i32),
+    ChangeHeadingWithTurnDirection(i32, TurnDirection),
     ChangeAltitude(u32),
     ChangeSpeed(u32),
     ClearedToLand(bool),
@@ -19,6 +20,18 @@ impl AtcCommand {
                     // TODO: error handling
                     let hdg = iter.next().unwrap();
                     Some(AtcCommand::ChangeHeading(hdg.parse::<i32>().unwrap()))
+                }
+                "HDGL" => {
+                    let hdg = iter.next().unwrap();
+                    Some(AtcCommand::ChangeHeadingWithTurnDirection(
+                        hdg.parse::<i32>().unwrap(), TurnDirection::Left
+                    ))
+                }
+                "HDGR" => {
+                    let hdg = iter.next().unwrap();
+                    Some(AtcCommand::ChangeHeadingWithTurnDirection(
+                        hdg.parse::<i32>().unwrap(), TurnDirection::Right
+                    ))
                 }
                 "ALT" => {
                     let alt = iter.next().unwrap();
@@ -43,6 +56,9 @@ impl AtcCommand {
         match self {
             // for tts its better to print heading to 1 8 0 for example
             ChangeHeading(heading) => format!("heading to {}", heading),
+            ChangeHeadingWithTurnDirection(heading, direction) => {
+                format!("turn {} to {}", direction, heading)
+            }
             ChangeAltitude(alt) => format!("altitude to {} feet", alt),
             ChangeSpeed(speed) => format!("speed to {}", speed),
             ClearedToLand(cleared) => String::from(if *cleared {

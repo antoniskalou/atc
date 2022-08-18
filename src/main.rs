@@ -167,7 +167,7 @@ impl EventHandler<ggez::GameError> for Game {
                             aircraft.status = AircraftStatus::Landed;
                         } else if aircraft.is_localizer_captured(&ils) {
                             aircraft.status = AircraftStatus::Landing;
-                            aircraft.change_heading(runway.heading as i32);
+                            aircraft.change_heading(runway.heading as i32, None);
 
                             let expected_alt = ils.altitude(aircraft.position);
                             aircraft.change_altitude(expected_alt);

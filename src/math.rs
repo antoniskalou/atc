@@ -1,7 +1,7 @@
 // alternative to val.clamp(..) because it doesn't handle negative
 // values correctly
 pub fn clamp<N>(val: N, min: N, max: N) -> N
-where 
+where
     N: std::cmp::PartialOrd,
 {
     if val < min {
@@ -16,12 +16,7 @@ where
 /// See https://stackoverflow.com/a/28037434
 pub fn short_angle_distance(a: f32, b: f32) -> f32 {
     let diff = (b - a + 180.0) % 360.0 - 180.0;
-    let dist = if diff < -180.0 {
-        diff + 360.0
-    } else {
-        diff
-    };
-    dist.abs()
+    if diff < -180.0 { diff + 360.0 } else { diff }
 }
 
 fn repeat(t: f32, m: f32) -> f32 {
@@ -30,14 +25,14 @@ fn repeat(t: f32, m: f32) -> f32 {
 
 /// return the shortest distance between 2 angles
 /// E.g. 350 to 0 will return 10 instead of 350
-/// 
+///
 /// See https://gist.github.com/shaunlebron/8832585?permalink_comment_id=3227412#gistcomment-3227412
 pub fn angle_lerp(a: f32, b: f32, t: f32) -> f32 {
     let dt = repeat(b - a, 360.0);
     let lerp = lerp(a, a + if dt > 180.0 { dt - 360.0 } else { dt }, t) % 360.0;
 
     if lerp < 0.0 {
-        360.0 + lerp 
+        360.0 + lerp
     } else {
         lerp
     }
@@ -96,7 +91,6 @@ mod test {
         assert_eq!(180.0, short_angle_distance(90.0, 270.0));
         assert_eq!(180.0, short_angle_distance(270.0, 90.0));
     }
-
 
     #[test]
     fn test_clamp() {

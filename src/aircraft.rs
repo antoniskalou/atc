@@ -68,10 +68,19 @@ impl PartialEq for Callsign {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TurnDirection {
     Left,
     Right,
+}
+
+impl std::fmt::Display for TurnDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Left => "left",
+            Self::Right => "right",
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -95,11 +104,29 @@ impl HeadingParameter {
         if self.intended != intended {
             self.intended = intended;
 
-            let initial_diff = short_angle_distance(self.intended, self.current);
+            let initial_diff = short_angle_distance(self.intended, self.current).abs();
             let duration = initial_diff * duration;
             self.interpolator = Some(Interpolator::with_fn(
-                self.current, self.intended, duration, angle_lerp,
+                self.current,
+                self.intended,
+                duration,
+                angle_lerp,
             ));
+        }
+    }
+
+    fn change_with_turn(&mut self, intended: f32, duration: f32, direction: TurnDirection) {
+        if self.intended != intended {
+            self.intended = intended;
+
+            let initial_diff = short_angle_distance(self.intended, self.current).abs();
+            let duration = initial_diff * duration;
+
+            // TODO
+            match direction {
+                TurnDirection::Left => {}
+                TurnDirection::Right => {}
+            }
         }
     }
 
@@ -164,11 +191,17 @@ pub struct Aircraft {
 }
 
 impl Aircraft {
-    pub fn change_heading(&mut self, course: i32) {
+    pub fn change_heading(&mut self, course: i32, direction: Option<TurnDirection>) {
         // time for 1 degree change
         let duration = 0.1;
-        let course = clamp(course, 0, 360);
-        self.heading.change(course as f32, duration);
+        let course = clamp(course, 0, 360) as f32;
+
+        match direction {
+            Some(direction) => 
+                self.heading.change_with_turn(course, duration, direction),
+            None => self.heading.change(course, duration)
+        }
+        
     }
 
     pub fn change_altitude(&mut self, new_altitude: u32) {
@@ -202,10 +235,12 @@ impl Aircraft {
         use AtcCommand::*;
         match cmd.0 {
             ChangeHeading(heading) => {
-                self.change_heading(heading)
+                self.change_heading(heading, None)
                 // reply
                 // TODO
             }
+            ChangeHeadingWithTurnDirection(heading, direction) => 
+                self.change_heading(heading, Some(direction)),
             ChangeAltitude(altitude) => self.change_altitude(altitude),
             ChangeSpeed(speed) => self.change_speed(speed),
             ClearedToLand(is_cleared) => {
