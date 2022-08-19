@@ -1,4 +1,4 @@
-// alternative to val.clamp(..) because it doesn't handle negative
+// Alternative to val.clamp(..) because it doesn't handle negative
 // values correctly
 pub fn clamp<N>(val: N, min: N, max: N) -> N
 where
@@ -13,23 +13,59 @@ where
     }
 }
 
+/// Returns the sign of the value. -1 or 1, or 0 if value is zero
+pub fn sign(s: f32) -> f32 {
+    if s < 0.0 {
+        -1.0
+    } else if s > 0.0 {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+/// Returns the inverse of the angle, in radians.
+pub fn complement_angle(angle: f32) -> f32 {
+    angle - 360.0 * sign(angle)
+}
+
+pub fn long_angle_distance(a: f32, b: f32) -> f32 {
+    complement_angle(short_angle_distance(a, b))
+}
+
+/// Returns the shortest angle distance in degrees.
+/// 
+/// Positive values represent a right direction, while negative values 
+/// represent a left direction.
+/// 
 /// See https://stackoverflow.com/a/28037434
 pub fn short_angle_distance(a: f32, b: f32) -> f32 {
     let diff = (b - a + 180.0) % 360.0 - 180.0;
     if diff < -180.0 { diff + 360.0 } else { diff }
 }
 
-fn repeat(t: f32, m: f32) -> f32 {
-    clamp(t - (t / m).floor() * m, 0.0, m)
-}
+// fn repeat(t: f32, m: f32) -> f32 {
+//     clamp(t - (t / m).floor() * m, 0.0, m)
+// }
 
 /// return the shortest distance between 2 angles
 /// E.g. 350 to 0 will return 10 instead of 350
 ///
 /// See https://gist.github.com/shaunlebron/8832585?permalink_comment_id=3227412#gistcomment-3227412
 pub fn angle_lerp(a: f32, b: f32, t: f32) -> f32 {
-    let dt = repeat(b - a, 360.0);
-    let lerp = lerp(a, a + if dt > 180.0 { dt - 360.0 } else { dt }, t) % 360.0;
+    // let dt = repeat(b - a, 360.0);
+    // let lerp = lerp(a, a + if dt > 180.0 { dt - 360.0 } else { dt }, t) % 360.0;
+    let lerp = (a + short_angle_distance(a, b) * t) % 360.0;
+
+    if lerp < 0.0 {
+        360.0 + lerp
+    } else {
+        lerp
+    }
+}
+
+pub fn long_angle_lerp(a: f32, b: f32, t: f32) -> f32 {
+    let lerp = (a + long_angle_distance(a, b) * t) % 360.0;
 
     if lerp < 0.0 {
         360.0 + lerp
@@ -85,11 +121,34 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_sign() {
+        assert_eq!(-1.0, sign(-6.0));
+        assert_eq!(1.0, sign(10.0));
+        assert_eq!(0.0, sign(0.0));
+    }
+
+    #[test]
+    fn test_complement_angle() {
+        assert_eq!(0.0, complement_angle(0.0));
+        assert_eq!(-270.0, complement_angle(90.0));
+        assert_eq!(-180.0, complement_angle(180.0));
+    }
+
+    #[test]
+    fn test_long_angle_distance() {
+        assert_eq!(-270.0, long_angle_distance(0.0, 90.0));
+        assert_eq!(180.0, long_angle_distance(0.0, 180.0));
+        assert_eq!(-340.0, long_angle_distance(350.0, 10.0).round());
+        assert_eq!(180.0, long_angle_distance(90.0, 270.0));
+        assert_eq!(180.0, long_angle_distance(270.0, 90.0));
+    }
+
+    #[test]
     fn test_short_angle_distance() {
         assert_eq!(20.0, short_angle_distance(350.0, 10.0));
-        assert_eq!(20.0, short_angle_distance(10.0, 350.0));
-        assert_eq!(180.0, short_angle_distance(90.0, 270.0));
-        assert_eq!(180.0, short_angle_distance(270.0, 90.0));
+        assert_eq!(-20.0, short_angle_distance(10.0, 350.0));
+        assert_eq!(-180.0, short_angle_distance(90.0, 270.0));
+        assert_eq!(-180.0, short_angle_distance(270.0, 90.0));
     }
 
     #[test]
@@ -115,5 +174,17 @@ mod test {
 
         assert_eq!(350.0, angle_lerp(10.0, 350.0, 1.0));
         assert_eq!(0.0, angle_lerp(10.0, 350.0, 0.5));
+    }
+
+    #[test]
+    fn test_long_angle_lerp() {
+        assert_eq!(10.0, long_angle_lerp(350.0, 10.0, 1.0));
+        assert_eq!(180.0, long_angle_lerp(350.0, 10.0, 0.5));
+
+        assert_eq!(0.0, long_angle_lerp(90.0, 0.0, 1.0));
+        assert_eq!(225.0, long_angle_lerp(90.0, 0.0, 0.5));
+
+        assert_eq!(350.0, long_angle_lerp(10.0, 350.0, 1.0));
+        assert_eq!(180.0, long_angle_lerp(10.0, 350.0, 0.5));
     }
 }

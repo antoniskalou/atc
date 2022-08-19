@@ -119,14 +119,25 @@ impl HeadingParameter {
         if self.intended != intended {
             self.intended = intended;
 
-            let initial_diff = short_angle_distance(self.intended, self.current).abs();
-            let duration = initial_diff * duration;
+            let initial_diff = short_angle_distance(self.intended, self.current);
+            let should_flip = match direction {
+                TurnDirection::Left => initial_diff < 0.0,
+                TurnDirection::Right => initial_diff > 0.0,
+            };
 
-            // TODO
-            match direction {
-                TurnDirection::Left => {}
-                TurnDirection::Right => {}
-            }
+            let duration_fn = if should_flip {
+                long_angle_distance
+            } else {
+                short_angle_distance
+            };
+            let duration = duration_fn(self.intended, self.current).abs() * duration;
+
+            self.interpolator = Some(Interpolator::with_fn(
+                self.current, 
+                self.intended,
+                duration, 
+                if should_flip { long_angle_lerp } else { angle_lerp }
+            ));
         }
     }
 
@@ -201,7 +212,6 @@ impl Aircraft {
                 self.heading.change_with_turn(course, duration, direction),
             None => self.heading.change(course, duration)
         }
-        
     }
 
     pub fn change_altitude(&mut self, new_altitude: u32) {
