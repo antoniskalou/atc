@@ -21,13 +21,13 @@ impl AtcCommand {
                     let hdg = iter.next().unwrap();
                     Some(AtcCommand::ChangeHeading(hdg.parse::<i32>().unwrap()))
                 }
-                "HDGL" => {
+                "TURNL" => {
                     let hdg = iter.next().unwrap();
                     Some(AtcCommand::ChangeHeadingWithTurnDirection(
                         hdg.parse::<i32>().unwrap(), TurnDirection::Left
                     ))
                 }
-                "HDGR" => {
+                "TURNR" => {
                     let hdg = iter.next().unwrap();
                     Some(AtcCommand::ChangeHeadingWithTurnDirection(
                         hdg.parse::<i32>().unwrap(), TurnDirection::Right
