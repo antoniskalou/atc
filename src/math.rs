@@ -44,34 +44,16 @@ pub fn short_angle_distance(a: f32, b: f32) -> f32 {
     if diff < -180.0 { diff + 360.0 } else { diff }
 }
 
-// fn repeat(t: f32, m: f32) -> f32 {
-//     clamp(t - (t / m).floor() * m, 0.0, m)
-// }
-
 /// return the shortest distance between 2 angles
 /// E.g. 350 to 0 will return 10 instead of 350
 ///
 /// See https://gist.github.com/shaunlebron/8832585?permalink_comment_id=3227412#gistcomment-3227412
 pub fn angle_lerp(a: f32, b: f32, t: f32) -> f32 {
-    // let dt = repeat(b - a, 360.0);
-    // let lerp = lerp(a, a + if dt > 180.0 { dt - 360.0 } else { dt }, t) % 360.0;
-    let lerp = (a + short_angle_distance(a, b) * t) % 360.0;
-
-    if lerp < 0.0 {
-        360.0 + lerp
-    } else {
-        lerp
-    }
+    (a + short_angle_distance(a, b) * t).rem_euclid(360.0)
 }
 
 pub fn long_angle_lerp(a: f32, b: f32, t: f32) -> f32 {
-    let lerp = (a + long_angle_distance(a, b) * t) % 360.0;
-
-    if lerp < 0.0 {
-        360.0 + lerp
-    } else {
-        lerp
-    }
+    (a + long_angle_distance(a, b) * t).rem_euclid(360.0)
 }
 
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
