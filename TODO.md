@@ -7,3 +7,5 @@
 
 # Ideas
 - Integrate with MSFS
+    - Find lat/long for airport being used
+    - Add AI aircraft

@@ -40,8 +40,7 @@ pub fn long_angle_distance(a: f32, b: f32) -> f32 {
 /// 
 /// See https://stackoverflow.com/a/28037434
 pub fn short_angle_distance(a: f32, b: f32) -> f32 {
-    let diff = (b - a + 180.0) % 360.0 - 180.0;
-    if diff < -180.0 { diff + 360.0 } else { diff }
+    (b - a + 180.0).rem_euclid(360.0) - 180.0
 }
 
 /// return the shortest distance between 2 angles

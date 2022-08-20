@@ -205,6 +205,7 @@ impl Aircraft {
     pub fn change_heading(&mut self, course: i32, direction: Option<TurnDirection>) {
         // time for 1 degree change
         let duration = 0.1;
+        // FIXME: don't use clamp, use rem_euclid (maybe)
         let course = clamp(course, 0, 360) as f32;
 
         match direction {
@@ -225,7 +226,7 @@ impl Aircraft {
         let duration = 1.0;
         // TODO: depends on aircraft type
         self.speed
-            .change(new_speed.clamp(150, 250) as f32, duration);
+            .change(clamp(new_speed, 150, 250) as f32, duration);
     }
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {
