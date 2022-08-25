@@ -4,6 +4,7 @@ mod cli;
 mod command;
 mod geom;
 mod math;
+mod msfs;
 mod tts;
 
 use crate::aircraft::*;

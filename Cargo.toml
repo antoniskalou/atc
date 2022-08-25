@@ -11,3 +11,5 @@ ggez = "^0.6.1"
 
 # text to speech
 # tts = "^0.20"
+
+msfs = "^0.1.0"
