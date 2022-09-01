@@ -34,10 +34,10 @@ pub fn long_angle_distance(a: f32, b: f32) -> f32 {
 }
 
 /// Returns the shortest angle distance in degrees.
-/// 
-/// Positive values represent a right direction, while negative values 
+///
+/// Positive values represent a right direction, while negative values
 /// represent a left direction.
-/// 
+///
 /// See https://stackoverflow.com/a/28037434
 pub fn short_angle_distance(a: f32, b: f32) -> f32 {
     (b - a + 180.0).rem_euclid(360.0) - 180.0

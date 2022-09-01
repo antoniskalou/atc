@@ -76,10 +76,14 @@ pub enum TurnDirection {
 
 impl std::fmt::Display for TurnDirection {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Self::Left => "left",
-            Self::Right => "right",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Left => "left",
+                Self::Right => "right",
+            }
+        )
     }
 }
 
@@ -133,10 +137,14 @@ impl HeadingParameter {
             let duration = duration_fn(self.intended, self.current).abs() * duration;
 
             self.interpolator = Some(Interpolator::with_fn(
-                self.current, 
+                self.current,
                 self.intended,
-                duration, 
-                if should_flip { long_angle_lerp } else { angle_lerp }
+                duration,
+                if should_flip {
+                    long_angle_lerp
+                } else {
+                    angle_lerp
+                },
             ));
         }
     }
@@ -209,9 +217,8 @@ impl Aircraft {
         let course = clamp(course, 0, 360) as f32;
 
         match direction {
-            Some(direction) => 
-                self.heading.change_with_turn(course, duration, direction),
-            None => self.heading.change(course, duration)
+            Some(direction) => self.heading.change_with_turn(course, duration, direction),
+            None => self.heading.change(course, duration),
         }
     }
 
@@ -250,8 +257,9 @@ impl Aircraft {
                 // reply
                 // TODO
             }
-            ChangeHeadingWithTurnDirection(heading, direction) => 
-                self.change_heading(heading, Some(direction)),
+            ChangeHeadingWithTurnDirection(heading, direction) => {
+                self.change_heading(heading, Some(direction))
+            }
             ChangeAltitude(altitude) => self.change_altitude(altitude),
             ChangeSpeed(speed) => self.change_speed(speed),
             ClearedToLand(is_cleared) => {

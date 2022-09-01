@@ -12,4 +12,8 @@ ggez = "^0.6.1"
 # text to speech
 # tts = "^0.20"
 
+# Sim integration
 msfs = "^0.1.0"
+
+# for handling coordinates
+dms-coordinates = "^1.1"

@@ -1,6 +1,4 @@
-use msfs::sim_connect::{
-    SimConnect
-};
+use msfs::sim_connect::SimConnect;
 use std::pin::Pin;
 
 pub struct MSFS {
@@ -20,6 +18,6 @@ impl MSFS {
             }
         });
 
-        Ok(Self { thread, })
+        Ok(Self { thread })
     }
 }

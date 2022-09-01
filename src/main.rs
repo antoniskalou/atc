@@ -2,6 +2,7 @@ mod aircraft;
 mod atc;
 mod cli;
 mod command;
+mod geo;
 mod geom;
 mod math;
 mod msfs;
@@ -11,6 +12,7 @@ use crate::aircraft::*;
 use crate::atc::*;
 use crate::cli::*;
 use crate::command::*;
+use crate::geo::*;
 use crate::geom::*;
 use ggez::{
     event::{self, EventHandler, KeyCode, MouseButton},
@@ -22,6 +24,22 @@ const TTS_ENABLED: bool = false;
 
 const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
+
+// 34°43′06″N 32°29′06″E
+const PAPHOS_LATLONG: LatLong = LatLong {
+    lat: Coord {
+        degrees: 34,
+        minutes: 43,
+        seconds: 06,
+        direction: CoordDirection::N,
+    },
+    long: Coord {
+        degrees: 32,
+        minutes: 29,
+        seconds: 06,
+        direction: CoordDirection::E,
+    },
+};
 
 #[derive(Debug)]
 struct Game {
