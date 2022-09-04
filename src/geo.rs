@@ -1,27 +1,9 @@
 use crate::geom::Point;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum CoordDirection {
-    N,
-    E,
-    S,
-    W,
-}
-
-// pub struct Coord(f32);
-
-#[derive(Clone, Debug)]
-pub struct Coord {
-    pub degrees: i8,
-    pub minutes: i8,
-    pub seconds: i8,
-    pub direction: CoordDirection,
-}
-
 #[derive(Clone, Debug)]
 pub struct LatLong {
-    pub lat: Coord,
-    pub long: Coord,
+    pub lat: dms_coordinates::DMS,
+    pub long: dms_coordinates::DMS,
 }
 
 impl LatLong {
@@ -32,4 +14,8 @@ impl LatLong {
     //         long: origin.y + v.y,
     //     }
     // }
+
+    pub fn to_game_world(&self, origin: LatLong) -> Point {
+        Point { x: 0.0, y: 0.0 } 
+    }
 }
