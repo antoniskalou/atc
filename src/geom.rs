@@ -42,12 +42,16 @@ pub fn rotate_points(origin: Point, points: &[Point], angle: f32) -> Vec<Point> 
 }
 
 pub fn heading_to_vector(heading: i32) -> Point {
-    let heading = (heading as f32 - 90.0).to_radians();
-    Point {
-        x: heading.cos(),
-        y: heading.sin(),
-    }
+    rotate_point(
+        Point { x: 0.0, y: 0.0 },
+        Point { x: 0.0, y: 1.0 }, // north
+        (heading as f32).to_radians(),
+    )
 }
+
+// pub fn vector_to_heading(p: Point) -> i32 {
+//     p.x.atan2(p.y).trunc() as i32
+// }
 
 /// Translates the world coordinate system, which
 /// has Y pointing up and the origin at the center,
@@ -57,4 +61,35 @@ pub fn world_to_screen_coords(screen_width: f32, screen_height: f32, point: Poin
     let x = point.x + screen_width / 2.0;
     let y = screen_height - (point.y + screen_height / 2.0);
     Point { x, y }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_heading_to_vector() {
+        assert_eq!((0.0, 1.0), (heading_to_vector(0).x, heading_to_vector(0).y));
+        assert_eq!(
+            (1.0, 0.0),
+            (
+                heading_to_vector(90).x.trunc(),
+                heading_to_vector(90).y.trunc()
+            )
+        );
+        assert_eq!(
+            (0.0, -1.0),
+            (
+                heading_to_vector(180).x.trunc(),
+                heading_to_vector(180).y.trunc()
+            )
+        );
+        assert_eq!(
+            (-1.0, 0.0),
+            (
+                heading_to_vector(270).x.trunc(),
+                heading_to_vector(270).y.trunc()
+            )
+        );
+    }
 }

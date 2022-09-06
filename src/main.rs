@@ -73,7 +73,10 @@ impl Game {
             selected_aircraft: None,
             aircraft: vec![
                 Aircraft {
-                    position: ggez::mint::Point2 { x: -100.0, y: -200.0 },
+                    position: ggez::mint::Point2 {
+                        x: -100.0,
+                        y: -200.0,
+                    },
                     callsign: Callsign {
                         name: "Cyprus Airways".into(),
                         code: "CYP".into(),
@@ -88,10 +91,7 @@ impl Game {
                     cleared_to_land: false,
                 },
                 Aircraft {
-                    position: ggez::mint::Point2 {
-                        x: 100.0,
-                        y: 300.0,
-                    },
+                    position: ggez::mint::Point2 { x: 100.0, y: 300.0 },
                     callsign: Callsign {
                         name: "Fedex".into(),
                         code: "FDX".into(),
@@ -104,7 +104,10 @@ impl Game {
                     cleared_to_land: false,
                 },
                 Aircraft {
-                    position: ggez::mint::Point2 { x: 200.0, y: -400.0 },
+                    position: ggez::mint::Point2 {
+                        x: 200.0,
+                        y: -400.0,
+                    },
                     callsign: Callsign {
                         name: "Transavia".into(),
                         code: "TRA".into(),
@@ -165,6 +168,7 @@ impl EventHandler<ggez::GameError> for Game {
 
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {
+                // FIXME: use scale in nm
                 let speed_scale = 50.0;
                 let speed_change = (aircraft.speed.current(dt) * dt) / speed_scale;
 
