@@ -27,14 +27,14 @@ const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
 // 34°43′06″N 32°29′06″E
-const PAPHOS_LATLONG: LatLong = LatLong {
+const PAPHOS_LATLONG: LatLon = LatLon {
     lat: DMS {
         degrees: 34,
         minutes: 43,
         seconds: 6.0,
         cardinal: Some(Cardinal::North),
     },
-    long: DMS {
+    lon: DMS {
         degrees: 32,
         minutes: 29,
         seconds: 6.0,
@@ -168,7 +168,7 @@ impl EventHandler<ggez::GameError> for Game {
 
         for mut aircraft in &mut self.aircraft {
             if !aircraft.is_grounded() {
-                // FIXME: use scale in nm
+                // FIXME: use scale in meters
                 let speed_scale = 50.0;
                 let speed_change = (aircraft.speed.current(dt) * dt) / speed_scale;
 
