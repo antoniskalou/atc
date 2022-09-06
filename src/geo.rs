@@ -16,6 +16,6 @@ impl LatLong {
     // }
 
     pub fn to_game_world(&self, origin: LatLong) -> Point {
-        Point { x: 0.0, y: 0.0 } 
+        Point { x: 0.0, y: 0.0 }
     }
 }

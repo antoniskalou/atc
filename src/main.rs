@@ -65,7 +65,7 @@ impl Game {
             atc: Atc::new(TTS_ENABLED),
             cli: CliPrompt::new(String::from("ATC>")),
             airports: vec![Airport {
-                position: Point { x: 500.0, y: 550.0 },
+                position: Point { x: 0.0, y: 0.0 },
                 icao_code: "LCPH".into(),
                 takeoff_runways: vec![runway_29.clone()],
                 landing_runways: vec![runway_29.clone()],
@@ -73,7 +73,7 @@ impl Game {
             selected_aircraft: None,
             aircraft: vec![
                 Aircraft {
-                    position: ggez::mint::Point2 { x: 250.0, y: 200.0 },
+                    position: ggez::mint::Point2 { x: -100.0, y: -200.0 },
                     callsign: Callsign {
                         name: "Cyprus Airways".into(),
                         code: "CYP".into(),
@@ -89,8 +89,8 @@ impl Game {
                 },
                 Aircraft {
                     position: ggez::mint::Point2 {
-                        x: 800.0,
-                        y: 1000.0,
+                        x: 100.0,
+                        y: 300.0,
                     },
                     callsign: Callsign {
                         name: "Fedex".into(),
@@ -104,7 +104,7 @@ impl Game {
                     cleared_to_land: false,
                 },
                 Aircraft {
-                    position: ggez::mint::Point2 { x: 500.0, y: 400.0 },
+                    position: ggez::mint::Point2 { x: 200.0, y: -400.0 },
                     callsign: Callsign {
                         name: "Transavia".into(),
                         code: "TRA".into(),
@@ -243,12 +243,18 @@ impl EventHandler<ggez::GameError> for Game {
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, Color::BLACK);
 
+        let screen_size = graphics::screen_coordinates(ctx);
+
         for airport in &self.airports {
             let icao_text = graphics::Text::new(airport.icao_code.clone());
             graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
             graphics::draw_queued_text(
                 ctx,
-                graphics::DrawParam::new().dest(airport.position),
+                graphics::DrawParam::new().dest(world_to_screen_coords(
+                    screen_size.w,
+                    screen_size.h,
+                    airport.position,
+                )),
                 None,
                 graphics::FilterMode::Linear,
             )?;
@@ -258,7 +264,12 @@ impl EventHandler<ggez::GameError> for Game {
                 let mesh = runway.as_mesh(ctx, origin, Color::RED)?;
                 graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
-                let ils = runway.ils(origin).as_triangle();
+                let ils = runway
+                    .ils(origin)
+                    .as_triangle()
+                    .iter()
+                    .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone()))
+                    .collect::<Vec<Point>>();
                 let mesh = graphics::Mesh::new_polygon(
                     ctx,
                     graphics::DrawMode::stroke(2.0),
@@ -270,12 +281,13 @@ impl EventHandler<ggez::GameError> for Game {
         }
 
         for aircraft in &self.aircraft {
+            let pos = world_to_screen_coords(screen_size.w, screen_size.h, aircraft.position);
             let aircraft_rect = graphics::Mesh::new_rectangle(
                 ctx,
                 graphics::DrawMode::fill(),
                 graphics::Rect::new(
-                    aircraft.position.x - AIRCRAFT_RADIUS,
-                    aircraft.position.y - AIRCRAFT_RADIUS,
+                    pos.x - AIRCRAFT_RADIUS,
+                    pos.y - AIRCRAFT_RADIUS,
                     AIRCRAFT_RADIUS * 2.0,
                     AIRCRAFT_RADIUS * 2.0,
                 ),
@@ -287,7 +299,7 @@ impl EventHandler<ggez::GameError> for Game {
             let bounding_circle = graphics::Mesh::new_circle(
                 ctx,
                 graphics::DrawMode::stroke(2.0),
-                aircraft.position,
+                pos,
                 AIRCRAFT_BOUNDING_RADIUS,
                 1.0,
                 Color::GREEN,
@@ -334,7 +346,7 @@ impl EventHandler<ggez::GameError> for Game {
 
             graphics::draw_queued_text(
                 ctx,
-                graphics::DrawParam::new().dest(aircraft.position),
+                graphics::DrawParam::new().dest(pos),
                 None,
                 graphics::FilterMode::Linear,
             )?;

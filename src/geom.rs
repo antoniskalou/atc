@@ -23,12 +23,13 @@ pub fn is_point_in_triangle(point: Point, triangle: Vec<Point>) -> bool {
     !(has_neg && has_pos)
 }
 
+/// Rotate a point by an angle (in degrees) around an origin (clockwise)
 pub fn rotate_point(origin: Point, point: Point, angle: f32) -> Point {
     let cos = angle.cos();
     let sin = angle.sin();
 
     Point {
-        x: (point.x - origin.x) * cos - (point.y - origin.y) * sin + origin.x,
+        x: (point.x - origin.x) * cos + (point.y - origin.y) * sin + origin.x,
         y: (point.y - origin.y) * cos - (point.x - origin.x) * sin + origin.y,
     }
 }
