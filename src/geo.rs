@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use geo::{HaversineDestination, HaversineDistance, VincentyDistance};
+use geo::{HaversineDestination, HaversineDistance, VincentyDistance, GeodesicDistance};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Cardinal {
@@ -162,6 +162,11 @@ impl LatLon {
     pub fn vincenty_distance(&self, other: &LatLon) -> f64 {
         self.0.vincenty_distance(&other.0).unwrap()
     }
+
+    // if we decide on this, consider using geographiclib_rs
+    pub fn geodesic_distance(&self, other: &LatLon) -> f64 {
+        self.0.geodesic_distance(&other.0)
+    }
 }
 
 #[cfg(test)]
@@ -174,10 +179,7 @@ mod test {
     fn test_latlon_haversine_destination() {
         let lax = LatLon::new(33.95, -118.4);
         let distance = (100.0 * NM2KM) * 1000.0;
-        println!("distance: {}", distance);
         let dest = lax.haversine_destination(66.0, distance);
-        println!("lax: {:?}", lax);
-        println!("dest: {:?}", dest);
         assert_eq!(34.6, (dest.0.y() * 10.0).round() / 10.0);
         assert_eq!(-116.6, (dest.0.x() * 10.0).round() / 10.0);
         assert_eq!(distance.round(), lax.haversine_distance(&dest).round());
