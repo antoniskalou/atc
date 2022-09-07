@@ -11,8 +11,6 @@ ggez = "^0.6.1"
 
 # WSG84
 nav-types = "^0.5.1"
-# Formatting coordinates
-recoord = { version = "^0.2.6", features = ["format_dms"] }
 
 # Sim integration
 msfs = "^0.1.0"
