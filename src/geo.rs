@@ -1,5 +1,5 @@
+use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::fmt::Display;
-use geo::{HaversineDestination, HaversineDistance, VincentyDistance, GeodesicDistance};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Cardinal {
@@ -94,23 +94,33 @@ impl DMS {
 impl Display for DMS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(cardinal) = self.cardinal {
-            write!(f, "{}°{}'{:.2}\"{}", self.degrees, self.minutes, self.seconds, cardinal)
+            write!(
+                f,
+                "{}°{}'{:.2}\"{}",
+                self.degrees, self.minutes, self.seconds, cardinal
+            )
         } else {
             write!(f, "{}°{}'{:.2}\"", self.degrees, self.minutes, self.seconds)
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct LatLon(geo::Point<f64>);
+#[derive(Copy, Clone, Debug)]
+pub struct LatLon {
+    lat: f64,
+    lon: f64,
+}
 
 impl LatLon {
     pub fn new(lat: f64, lon: f64) -> Self {
-        Self(geo::Point::new(lon, lat))
+        Self { lat, lon }
     }
 
     pub fn from_dms(lat: DMS, lon: DMS) -> Self {
-        Self(geo::Point::new(lat.to_degrees(), lon.to_degrees()))
+        Self {
+            lat: lat.to_degrees(),
+            lon: lon.to_degrees(),
+        }
     }
 
     pub fn to_dms(&self) -> (DMS, DMS) {
@@ -120,9 +130,13 @@ impl LatLon {
         )
     }
 
-    pub fn latitude(&self) -> f64 { self.0.y() }
+    pub fn latitude(&self) -> f64 {
+        self.lat
+    }
 
-    pub fn longitude(&self) -> f64 { self.0.x() }
+    pub fn longitude(&self) -> f64 {
+        self.lon
+    }
 
     // TODO: test, not sure if implementation is correct
     // pub fn distance(&self, other: LatLon) -> (f64, f64) {
@@ -151,21 +165,16 @@ impl LatLon {
     ///
     /// algorithm from http://edwilliams.org/avform147.htm#LL and
     /// https://docs.rs/geo/0.14.2/src/geo/algorithm/haversine_destination.rs.html#33
-    pub fn haversine_destination(&self, bearing: f64, distance: f64) -> LatLon {
-        Self(self.0.haversine_destination(bearing, distance))
+
+    pub fn destination(&self, bearing: f64, distance: f64) -> LatLon {
+        let g = Geodesic::wgs84();
+        let (lat, lon) = g.direct(self.lat, self.lon, bearing, distance);
+        Self { lat, lon }
     }
 
-    pub fn haversine_distance(&self, other: &LatLon) -> f64 {
-        self.0.haversine_distance(&other.0)
-    }
-
-    pub fn vincenty_distance(&self, other: &LatLon) -> f64 {
-        self.0.vincenty_distance(&other.0).unwrap()
-    }
-
-    // if we decide on this, consider using geographiclib_rs
-    pub fn geodesic_distance(&self, other: &LatLon) -> f64 {
-        self.0.geodesic_distance(&other.0)
+    pub fn distance(&self, other: &LatLon) -> f64 {
+        let g = Geodesic::wgs84();
+        g.inverse(self.lat, self.lon, other.lat, other.lon)
     }
 }
 
@@ -176,33 +185,20 @@ mod test {
     const NM2KM: f64 = 1.852;
 
     #[test]
-    fn test_latlon_haversine_destination() {
+    fn test_latlon_destination() {
         let lax = LatLon::new(33.95, -118.4);
         let distance = (100.0 * NM2KM) * 1000.0;
-        let dest = lax.haversine_destination(66.0, distance);
-        assert_eq!(34.6, (dest.0.y() * 10.0).round() / 10.0);
-        assert_eq!(-116.6, (dest.0.x() * 10.0).round() / 10.0);
-        assert_eq!(distance.round(), lax.haversine_distance(&dest).round());
-    }
-
-    #[test]
-    fn test_latlon_haversine_distance() {
-        let lcph = LatLon::new(34.717778, 32.485556);
-        let lclk = LatLon::new(34.875, 33.624722);
-
-        assert_eq!(105_477.0, lcph.haversine_distance(&lclk).round());
-    }
-
-    #[test]
-    fn test_latlon_vincenty_distance() {
-        let lcph = LatLon::new(34.717778, 32.485556);
-        let lclk = LatLon::new(34.875, 33.624722);
-
-        assert_eq!(105_698., lcph.vincenty_distance(&lclk).round());
+        let dest = lax.destination(66.0, distance);
+        assert_eq!(34.6, (dest.latitude() * 10.0).round() / 10.0);
+        assert_eq!(-116.6, (dest.longitude() * 10.0).round() / 10.0);
+        assert_eq!(distance.round(), lax.distance(&dest).round());
     }
 
     #[test]
     fn test_latlon_distance() {
-        unimplemented!();
+        let lcph = LatLon::new(34.717778, 32.485556);
+        let lclk = LatLon::new(34.875, 33.624722);
+
+        assert_eq!(105_698., lcph.distance(&lclk).round());
     }
 }

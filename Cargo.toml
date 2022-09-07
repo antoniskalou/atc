@@ -10,7 +10,7 @@ mint = "^0.5.6"
 ggez = "^0.6.1"
 
 # WSG84
-geo = "^0.23.0"
+geographiclib-rs = "^0.2.1"
 
 # Sim integration
 msfs = "^0.1.0"
