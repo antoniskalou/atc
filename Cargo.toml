@@ -17,3 +17,5 @@ msfs = "^0.1.0"
 
 # Text to speech, TODO: find better crate
 # tts = "^0.20"
+
+[dev-dependencies]

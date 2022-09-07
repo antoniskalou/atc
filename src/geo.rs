@@ -138,19 +138,13 @@ impl LatLon {
         self.lon
     }
 
-    // TODO: test, not sure if implementation is correct
-    // pub fn distance(&self, other: LatLon) -> (f64, f64) {
-    //     let x = dms_coordinates::projected_distance(
-    //         (other.lat.to_ddeg_angle(), 0.0),
-    //         (self.lat.to_ddeg_angle(), 0.0),
-    //     );
-    //     let y = dms_coordinates::projected_distance(
-    //         (0.0, other.lon.to_ddeg_angle()),
-    //         (0.0, self.lat.to_ddeg_angle()),
-    //     );
-
-    //     (x, y)
-    // }
+    pub fn distance_xy(&self, other: &LatLon) -> (f64, f64) {
+        // FIXME: for some reason distance & azimuth aren't corrent unless a 4 tuple
+        let (distance, azimuth, _, _) = 
+            Geodesic::wgs84().inverse(self.lat, self.lon, other.lat, other.lon);
+        let p = crate::geom::heading_to_vector(azimuth.round() as i32);
+        (p.x as f64 * distance, p.y as f64 * distance)
+    }
 
     // pub fn to_game_world(&self, origin: LatLon) -> Point {
     //     let (x, y) = self.distance(origin);
@@ -162,19 +156,13 @@ impl LatLon {
 
     /// Return a new latitude/longitude offset by a distance in meters and a bearing
     /// in degrees.
-    ///
-    /// algorithm from http://edwilliams.org/avform147.htm#LL and
-    /// https://docs.rs/geo/0.14.2/src/geo/algorithm/haversine_destination.rs.html#33
-
     pub fn destination(&self, bearing: f64, distance: f64) -> LatLon {
-        let g = Geodesic::wgs84();
-        let (lat, lon) = g.direct(self.lat, self.lon, bearing, distance);
+        let (lat, lon) = Geodesic::wgs84().direct(self.lat, self.lon, bearing, distance);
         Self { lat, lon }
     }
 
     pub fn distance(&self, other: &LatLon) -> f64 {
-        let g = Geodesic::wgs84();
-        g.inverse(self.lat, self.lon, other.lat, other.lon)
+        Geodesic::wgs84().inverse(self.lat, self.lon, other.lat, other.lon)
     }
 }
 
@@ -187,18 +175,17 @@ mod test {
 
     // Paphos Airport
     const LCPH: LatLon = LatLon {
-        lat: 34.717778, 
+        lat: 34.717778,
         lon: 32.485556,
     };
     // Larnaca Airport
     const LCLK: LatLon = LatLon {
-        lat: 34.875, 
+        lat: 34.875,
         lon: 33.624722,
     };
 
     #[test]
     fn test_latlon_destination() {
-        // 35° 42' 31.90" N 34° 36' 20.48" E
         let distance = (120.0 * NM2KM) * 1000.0;
         let dest = LCPH.destination(54.0, distance);
         assert_eq!(35.9, round_decimal(dest.latitude(), 1));
@@ -209,5 +196,20 @@ mod test {
     #[test]
     fn test_latlon_distance() {
         assert_eq!(105_698., LCPH.distance(&LCLK).round());
+    }
+
+    #[test]
+    fn test_latlon_distance_xy() {
+        let dest = LCPH.destination(0.0, 10.0);
+        assert_eq!(0.0, LCPH.distance_xy(&dest).0.round());
+        assert_eq!(10.0, LCPH.distance_xy(&dest).1.round());
+
+        let dest = LCPH.destination(90.0, 10.0);
+        assert_eq!(10.0, LCPH.distance_xy(&dest).0.round());
+        assert_eq!(0.0, LCPH.distance_xy(&dest).1.round());
+
+        let dest = LCPH.destination(45.0, 10.0);
+        assert_eq!(7.0, LCPH.distance_xy(&dest).0.round());
+        assert_eq!(7.0, LCPH.distance_xy(&dest).1.round());
     }
 }
