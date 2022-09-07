@@ -9,8 +9,6 @@ edition = "2018"
 mint = "^0.5.6"
 ggez = "^0.6.1"
 
-# for handling coordinates
-dms-coordinates = { path = "lib/dms-coordinates" }
 # WSG84
 nav-types = "^0.5.1"
 # Formatting coordinates

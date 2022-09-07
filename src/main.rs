@@ -14,7 +14,6 @@ use crate::cli::*;
 use crate::command::*;
 use crate::geo::*;
 use crate::geom::*;
-use dms_coordinates::{Cardinal, DMS};
 use ggez::{
     event::{self, EventHandler, KeyCode, MouseButton},
     graphics::{self, Color},

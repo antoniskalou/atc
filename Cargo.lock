@@ -117,7 +117,6 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 name = "atc"
 version = "0.1.0"
 dependencies = [
- "dms-coordinates",
  "ggez",
  "mint",
  "msfs",
@@ -749,13 +748,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac1b7517328c04c2aa68422fc60a41b92208182142ed04a25879c26c8f878794"
 dependencies = [
  "libloading 0.7.1",
-]
-
-[[package]]
-name = "dms-coordinates"
-version = "1.1.0"
-dependencies = [
- "thiserror",
 ]
 
 [[package]]
