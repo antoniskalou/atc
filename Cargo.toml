@@ -11,6 +11,7 @@ ggez = "^0.6.1"
 
 # WSG84
 nav-types = "^0.5.1"
+geo = "^0.23.0"
 
 # Sim integration
 msfs = "^0.1.0"
