@@ -1,7 +1,7 @@
 [package]
 name = "atc"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,7 +12,7 @@ ggez = "^0.6.1"
 # WSG84
 nav-types = "^0.5.1"
 # Formatting coordinates
-# recoord = { version = "^0.2.6", features = ["format_dms"] }
+recoord = { version = "^0.2.6", features = ["format_dms"] }
 
 # Sim integration
 msfs = "^0.1.0"

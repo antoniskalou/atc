@@ -67,43 +67,34 @@ impl LatLon {
 #[cfg(test)]
 mod test {
     use super::*;
+    use nav_types::WGS84;
 
     const NM2KM: f64 = 1.852;
 
     #[test]
     fn test_latlon_haversine_destination() {
-        let LAX = LatLon(nav_types::WGS84::from_degrees_and_meters(33.95, -118.4, 0.0));
+        let lax = LatLon(nav_types::WGS84::from_degrees_and_meters(33.95, -118.4, 0.0));
         let distance = (100.0 * NM2KM) * 1000.0;
-        let dest = LAX.haversine_destination(distance, 66f64);
-        // assert_eq!(34, dest.lat.degrees);
-        // assert_eq!(36, dest.lat.minutes);
-        // assert_eq!(116, dest.lon.degrees);
-        // assert_eq!(33, dest.lon.minutes);
-
-        // degrees: (33.95, -118.4)
-        // dest degrees: (34.6136470460684, -116.55)
+        let dest = lax.haversine_destination(distance, 66f64);
         assert_eq!(34.6, (dest.0.latitude_degrees() * 10.0).round() / 10.0);
         assert_eq!(-116.6, (dest.0.longitude_degrees() * 10.0).round() / 10.0);
+        assert_eq!(distance.round(), lax.haversine_distance(&dest).round());
     }
 
     #[test]
-    fn test_wsg_distance() {
-        use nav_types::WGS84;
+    fn test_latlon_haversine_distance() {
+        let lcph = LatLon(WGS84::from_degrees_and_meters(34.717778, 32.485556, 0.0));
+        let lclk = LatLon(WGS84::from_degrees_and_meters(34.875, 33.624722, 0.0));
 
-        let LCPH = LatLon(WGS84::from_degrees_and_meters(34.717778, 32.485556, 0.0));
-        let LCLK = LatLon(WGS84::from_degrees_and_meters(34.875, 33.624722, 0.0));
-
-        assert_eq!(105_478.0, LCPH.haversine_distance(&LCLK).round());
+        assert_eq!(105_596.0, lcph.haversine_distance(&lclk).round());
     }
 
     #[test]
-    fn test_ecef_distance() {
-        use nav_types::{ECEF, WGS84};
+    fn test_latlon_vincenty_distance() {
+        let lcph = LatLon(WGS84::from_degrees_and_meters(34.717778, 32.485556, 0.0));
+        let lclk = LatLon(WGS84::from_degrees_and_meters(34.875, 33.624722, 0.0));
 
-        let LCPH = LatLon(WGS84::from_degrees_and_meters(34.717778, 32.485556, 0.0));
-        let LCLK = LatLon(WGS84::from_degrees_and_meters(34.875, 33.624722, 0.0));
-
-        assert_eq!(105_699.0, LCPH.vincenty_distance(&LCLK).round());
+        assert_eq!(105_696.0, lcph.vincenty_distance(&lclk).round());
     }
 
     #[test]
