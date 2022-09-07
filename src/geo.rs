@@ -1,44 +1,31 @@
-use crate::geom::Point;
-use dms_coordinates::DMS;
-
+/// Mean radius of the earth: 6.37 * 10^6 m
 const MEAN_EARTH_RADIUS: f64 = 6371008.8; 
 
 #[derive(Clone, Debug)]
-pub struct LatLon {
-    pub lat: DMS,
-    pub lon: DMS,
-}
+pub struct LatLon(nav_types::WGS84<f64>);
 
 impl LatLon {
-    // pub fn from_vector(origin: Point, v: Point) -> Self {
-    //     // simple implementation, needs conversion to/from game world
-    //     Self {
-    //         lat: origin.x + v.x,
-    //         lon: origin.y + v.y,
-    //     }
+    // TODO: test, not sure if implementation is correct
+    // pub fn distance(&self, other: LatLon) -> (f64, f64) {
+    //     let x = dms_coordinates::projected_distance(
+    //         (other.lat.to_ddeg_angle(), 0.0),
+    //         (self.lat.to_ddeg_angle(), 0.0),
+    //     );
+    //     let y = dms_coordinates::projected_distance(
+    //         (0.0, other.lon.to_ddeg_angle()),
+    //         (0.0, self.lat.to_ddeg_angle()),
+    //     );
+
+    //     (x, y)
     // }
 
-    // TODO: test, not sure if implementation is correct
-    pub fn distance(&self, other: LatLon) -> (f64, f64) {
-        let x = dms_coordinates::projected_distance(
-            (other.lat.to_ddeg_angle(), 0.0),
-            (self.lat.to_ddeg_angle(), 0.0),
-        );
-        let y = dms_coordinates::projected_distance(
-            (0.0, other.lon.to_ddeg_angle()),
-            (0.0, self.lat.to_ddeg_angle()),
-        );
-
-        (x, y)
-    }
-
-    pub fn to_game_world(&self, origin: LatLon) -> Point {
-        let (x, y) = self.distance(origin);
-        Point {
-            x: x as f32,
-            y: y as f32,
-        }
-    }
+    // pub fn to_game_world(&self, origin: LatLon) -> Point {
+    //     let (x, y) = self.distance(origin);
+    //     Point {
+    //         x: x as f32,
+    //         y: y as f32,
+    //     }
+    // }
 
     /// Return a new latitude/longitude offset by a distance in meters and a bearing
     /// in degrees.
@@ -46,8 +33,9 @@ impl LatLon {
     /// algorithm from http://edwilliams.org/avform147.htm#LL and
     /// https://docs.rs/geo/0.14.2/src/geo/algorithm/haversine_destination.rs.html#33
     pub fn haversine_destination(&self, distance: f64, bearing: f64) -> LatLon {
-        let center_lat = self.lat.to_radians();
-        let center_lon = self.lon.to_radians();
+        // TODO: consider using the vincenty formulae
+        let center_lat = self.0.latitude_radians();
+        let center_lon = self.0.longitude_radians();
         let bearing_rad = bearing.to_radians();
 
         let rad = distance / MEAN_EARTH_RADIUS;
@@ -60,43 +48,66 @@ impl LatLon {
         let lon = { bearing_rad.sin() * rad.sin() * center_lat.cos() }
             .atan2(rad.cos() - center_lat.sin() * lat.sin())
             + center_lon;
+    
+        Self(nav_types::WGS84::from_radians_and_meters(lat, lon, 0.0))
+    }
 
-        Self {
-            lat: DMS::from_ddeg_latitude(lat.to_degrees()),
-            lon: DMS::from_ddeg_longitude(lon.to_degrees()),
-        }
+    pub fn haversine_distance(&self, other: &LatLon) -> f64 {
+        self.0.distance(&other.0)
+    }
+
+    pub fn vincenty_distance(&self, other: &LatLon) -> f64 {
+        let ecef: nav_types::ECEF<f64> = self.0.into();
+        let ecef_other: nav_types::ECEF<f64> = other.0.into();
+
+        ecef.distance(&ecef_other)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::io::Write;
-
     use super::*;
 
-    const LAX: LatLon = LatLon {
-        lat: DMS {
-            degrees: 33,
-            minutes: 57,
-            seconds: 0.0,
-            cardinal: Some(dms_coordinates::Cardinal::North),
-        },
-        lon: DMS {
-            degrees: 118,
-            minutes: 24,
-            seconds: 0.0,
-            cardinal: Some(dms_coordinates::Cardinal::West),
-        },
-    };
+    const NM2KM: f64 = 1.852;
 
     #[test]
     fn test_latlon_haversine_destination() {
-        let nm2km = 1.852;
-        let distance = (100.0 * nm2km) * 1000.0;
+        let LAX = LatLon(nav_types::WGS84::from_degrees_and_meters(33.95, -118.4, 0.0));
+        let distance = (100.0 * NM2KM) * 1000.0;
         let dest = LAX.haversine_destination(distance, 66f64);
-        assert_eq!(34, dest.lat.degrees);
-        assert_eq!(36, dest.lat.minutes);
-        assert_eq!(116, dest.lon.degrees);
-        assert_eq!(33, dest.lon.minutes);
+        // assert_eq!(34, dest.lat.degrees);
+        // assert_eq!(36, dest.lat.minutes);
+        // assert_eq!(116, dest.lon.degrees);
+        // assert_eq!(33, dest.lon.minutes);
+
+        // degrees: (33.95, -118.4)
+        // dest degrees: (34.6136470460684, -116.55)
+        assert_eq!(34.6, (dest.0.latitude_degrees() * 10.0).round() / 10.0);
+        assert_eq!(-116.6, (dest.0.longitude_degrees() * 10.0).round() / 10.0);
+    }
+
+    #[test]
+    fn test_wsg_distance() {
+        use nav_types::WGS84;
+
+        let LCPH = LatLon(WGS84::from_degrees_and_meters(34.717778, 32.485556, 0.0));
+        let LCLK = LatLon(WGS84::from_degrees_and_meters(34.875, 33.624722, 0.0));
+
+        assert_eq!(105_478.0, LCPH.haversine_distance(&LCLK).round());
+    }
+
+    #[test]
+    fn test_ecef_distance() {
+        use nav_types::{ECEF, WGS84};
+
+        let LCPH = LatLon(WGS84::from_degrees_and_meters(34.717778, 32.485556, 0.0));
+        let LCLK = LatLon(WGS84::from_degrees_and_meters(34.875, 33.624722, 0.0));
+
+        assert_eq!(105_699.0, LCPH.vincenty_distance(&LCLK).round());
+    }
+
+    #[test]
+    fn test_latlon_distance() {
+        unimplemented!();
     }
 }

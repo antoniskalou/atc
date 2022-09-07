@@ -11,9 +11,13 @@ ggez = "^0.6.1"
 
 # for handling coordinates
 dms-coordinates = { path = "lib/dms-coordinates" }
+# WSG84
+nav-types = "^0.5.1"
+# Formatting coordinates
+# recoord = { version = "^0.2.6", features = ["format_dms"] }
 
 # Sim integration
 msfs = "^0.1.0"
 
-# text to speech
+# Text to speech, TODO: find better crate
 # tts = "^0.20"

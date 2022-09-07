@@ -1,11 +1,7 @@
 //! Cardinal points, only integer angles (N, NE, E, ..) are supported
 
-#[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
-
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 #[repr(u16)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Cardinal {
     /// Northern Cardinal
     North = 0,
@@ -23,14 +19,6 @@ pub enum Cardinal {
     West = 270,
     /// North Western Cardinal
     NorthWest = 315,
-}
-
-impl std::ops::Add<u16> for Cardinal {
-    type Output = Cardinal;
-    /// Adds given angle (°) to Self
-    fn add (self, rhs: u16) -> Self {
-        Cardinal::from_angle((self.to_angle() + rhs) % 360)
-    }
 }
 
 impl Default for Cardinal {
@@ -102,45 +90,6 @@ impl Cardinal {
         match self {
             Cardinal::West | Cardinal::NorthWest | Cardinal::SouthWest => true,
             _ => false,
-        }
-    }
-    /// Returns True if Self matches a subquadrant cardinal, like NE or SW
-    pub fn is_sub_quadrant (&self) -> bool {
-        (self.to_angle() / 45)%2 > 0
-    }
-    /// Returns compass angle (in D°) associated to Self,
-    /// 0° being North Cardinal
-    pub fn to_angle (&self) -> u16 {
-        match self {
-            Cardinal::North => 0,
-            Cardinal::NorthEast => 45,
-            Cardinal::East => 90,
-            Cardinal::SouthEast => 135,
-            Cardinal::South => 180,
-            Cardinal::SouthWest => 225,
-            Cardinal::West => 270,
-            Cardinal::NorthWest => 315,
-        }
-    }
-    /// Builds a Cardinal from given compass angle (in D°),
-    /// 0° being North Cardinal
-    pub fn from_angle (angle: u16) -> Cardinal {
-        if angle < 45 {
-            Cardinal::North
-        } else if angle < 90 {
-            Cardinal::NorthEast
-        } else if angle < 135 {
-            Cardinal::East
-        } else if angle < 180 {
-            Cardinal::SouthEast
-        } else if angle < 225 {
-            Cardinal::South
-        } else if angle < 270 {
-            Cardinal::SouthWest
-        } else if angle < 315 {
-            Cardinal::West
-        } else { 
-            Cardinal::NorthWest
         }
     }
 }

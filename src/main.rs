@@ -27,20 +27,20 @@ const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
 // 34°43′06″N 32°29′06″E
-const PAPHOS_LATLONG: LatLon = LatLon {
-    lat: DMS {
-        degrees: 34,
-        minutes: 43,
-        seconds: 6.0,
-        cardinal: Some(Cardinal::North),
-    },
-    lon: DMS {
-        degrees: 32,
-        minutes: 29,
-        seconds: 6.0,
-        cardinal: Some(Cardinal::East),
-    },
-};
+// const PAPHOS_LATLONG: LatLon = LatLon {
+//     lat: DMS {
+//         degrees: 34,
+//         minutes: 43,
+//         seconds: 6.0,
+//         cardinal: Some(Cardinal::North),
+//     },
+//     lon: DMS {
+//         degrees: 32,
+//         minutes: 29,
+//         seconds: 6.0,
+//         cardinal: Some(Cardinal::East),
+//     },
+// };
 
 #[derive(Debug)]
 struct Game {
