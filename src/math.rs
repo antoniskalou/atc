@@ -1,5 +1,20 @@
-// Alternative to val.clamp(..) because it doesn't handle negative
-// values correctly
+// TODO: convert all to use num crate
+
+pub fn round_decimal(val: f64, decimal_points: u8) -> f64 {
+    let multiplier = 10f64.powi(decimal_points as i32);
+    (val * multiplier).round() / multiplier
+}
+
+#[test]
+fn test_round_decimal() {
+    assert_eq!(1., round_decimal(1.43, 0));
+    assert_eq!(1.4, round_decimal(1.43, 1));
+    assert_eq!(1.44, round_decimal(1.435, 2));
+    assert_eq!(1.435, round_decimal(1.4351, 3));
+}
+
+/// Alternative to val.clamp(..) because it doesn't handle negative
+/// values correctly
 pub fn clamp<N>(val: N, min: N, max: N) -> N
 where
     N: std::cmp::PartialOrd,

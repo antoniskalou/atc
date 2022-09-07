@@ -181,24 +181,33 @@ impl LatLon {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::math::round_decimal;
 
     const NM2KM: f64 = 1.852;
 
+    // Paphos Airport
+    const LCPH: LatLon = LatLon {
+        lat: 34.717778, 
+        lon: 32.485556,
+    };
+    // Larnaca Airport
+    const LCLK: LatLon = LatLon {
+        lat: 34.875, 
+        lon: 33.624722,
+    };
+
     #[test]
     fn test_latlon_destination() {
-        let lax = LatLon::new(33.95, -118.4);
-        let distance = (100.0 * NM2KM) * 1000.0;
-        let dest = lax.destination(66.0, distance);
-        assert_eq!(34.6, (dest.latitude() * 10.0).round() / 10.0);
-        assert_eq!(-116.6, (dest.longitude() * 10.0).round() / 10.0);
-        assert_eq!(distance.round(), lax.distance(&dest).round());
+        // 35° 42' 31.90" N 34° 36' 20.48" E
+        let distance = (120.0 * NM2KM) * 1000.0;
+        let dest = LCPH.destination(54.0, distance);
+        assert_eq!(35.9, round_decimal(dest.latitude(), 1));
+        assert_eq!(34.5, round_decimal(dest.longitude(), 1));
+        assert_eq!(distance.round(), LCPH.distance(&dest).round());
     }
 
     #[test]
     fn test_latlon_distance() {
-        let lcph = LatLon::new(34.717778, 32.485556);
-        let lclk = LatLon::new(34.875, 33.624722);
-
-        assert_eq!(105_698., lcph.distance(&lclk).round());
+        assert_eq!(105_698., LCPH.distance(&LCLK).round());
     }
 }
