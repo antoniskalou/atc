@@ -1576,8 +1576,6 @@ dependencies = [
 [[package]]
 name = "msfs"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d1d3725b25d6079d27ee78614281f40a02dcf8d6a02e154519b02b47925bcf9"
 dependencies = [
  "bindgen 0.59.2",
  "cc",
@@ -1589,8 +1587,6 @@ dependencies = [
 [[package]]
 name = "msfs_derive"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2071a18a963700fd2082033da64c6b47f00932c8b85eee9e04ea0232290493b8"
 dependencies = [
  "msfs_sdk",
  "quote",
@@ -1600,8 +1596,6 @@ dependencies = [
 [[package]]
 name = "msfs_sdk"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3d872d1858eb8a2b38c4a01c3c07600657869f271353f5e2f1d7490f20463a"
 
 [[package]]
 name = "ndk"

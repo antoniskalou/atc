@@ -379,38 +379,40 @@ impl EventHandler<ggez::GameError> for Game {
     }
 }
 
-fn main() {
-    let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
-        .window_setup(ggez::conf::WindowSetup::default().title("ATC Simulator 2022"))
-        .window_mode(ggez::conf::WindowMode::default().dimensions(1600.0, 1200.0))
-        .build()
-        .expect("Could not create ggez context");
-
-    let game = Game::new(&mut ctx);
-    event::run(ctx, event_loop, game);
-}
-
 // fn main() {
-//     use msfs::sim_connect::SimConnect;
+//     let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
+//         .window_setup(ggez::conf::WindowSetup::default().title("ATC Simulator 2022"))
+//         .window_mode(ggez::conf::WindowMode::default().dimensions(1600.0, 1200.0))
+//         .build()
+//         .expect("Could not create ggez context");
 
-//     // 10m left of paphos airport, simulate missed approach
-//     let paphos = LatLon::new(34.714296, 32.497588).destination(290.0, 8000.0);
-//     let mut sim = SimConnect::open("ATC", |_sim, recv| println!("SimConnect: {:?}", recv))
-//         .expect("failed to open simconnect connection");
-//     let init_position = msfs::sim_connect::InitPosition {
-//         Airspeed: 100,
-//         Altitude: 500.0,
-//         Bank: 0.0,
-//         Heading: 110.0,
-//         Latitude: paphos.latitude(),
-//         Longitude: paphos.longitude(),
-//         OnGround: 0,
-//         Pitch: 0.0,
-//     };
-//     sim.ai_create_non_atc_aircraft("Just Flight 146-200QT TNT Old", "5B-AKC", init_position, 0).unwrap();
-
-//     loop {
-//         sim.call_dispatch().unwrap();
-//         std::thread::sleep(std::time::Duration::from_secs(1));
-//     }
+//     let game = Game::new(&mut ctx);
+//     event::run(ctx, event_loop, game);
 // }
+
+fn main() {
+    use msfs::sim_connect::SimConnect;
+
+    // 10m left of paphos airport, simulate missed approach
+    let paphos = LatLon::new(34.714296, 32.497588).destination(290.0, 8000.0);
+    let mut sim = SimConnect::open("ATC", |_sim, recv| println!("SimConnect: {:?}", recv))
+        .expect("failed to open simconnect connection");
+    let init_position = msfs::sim_connect::InitPosition {
+        Airspeed: 100,
+        Altitude: 500.0,
+        Bank: 0.0,
+        Heading: 110.0,
+        Latitude: paphos.latitude(),
+        Longitude: paphos.longitude(),
+        OnGround: 0,
+        Pitch: 0.0,
+    };
+    sim.ai_create_non_atc_aircraft("Just Flight 146-200QT TNT Old", "5B-AKC", init_position, 0).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    sim.ai_release_control(object_id, 0);
+
+    loop {
+        sim.call_dispatch().unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
