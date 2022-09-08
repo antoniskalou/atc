@@ -23,7 +23,7 @@ pub fn is_point_in_triangle(point: Point, triangle: Vec<Point>) -> bool {
     !(has_neg && has_pos)
 }
 
-/// Rotate a point by an angle (in degrees) around an origin (clockwise)
+/// Rotate a point by an angle (in radians) around an origin (clockwise)
 pub fn rotate_point(origin: Point, point: Point, angle: f32) -> Point {
     let cos = angle.cos();
     let sin = angle.sin();
@@ -41,7 +41,7 @@ pub fn rotate_points(origin: Point, points: &[Point], angle: f32) -> Vec<Point> 
         .collect()
 }
 
-pub fn heading_to_vector(heading: i32) -> Point {
+pub fn heading_to_point(heading: i32) -> Point {
     rotate_point(
         Point { x: 0.0, y: 0.0 },
         Point { x: 0.0, y: 1.0 }, // north
@@ -49,9 +49,9 @@ pub fn heading_to_vector(heading: i32) -> Point {
     )
 }
 
-// pub fn vector_to_heading(p: Point) -> i32 {
-//     p.x.atan2(p.y).trunc() as i32
-// }
+pub fn point_to_heading(p: Point) -> i32 {
+    p.x.atan2(p.y).trunc() as i32
+}
 
 /// Translates the world coordinate system, which
 /// has Y pointing up and the origin at the center,
@@ -68,27 +68,27 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_heading_to_vector() {
-        assert_eq!((0.0, 1.0), (heading_to_vector(0).x, heading_to_vector(0).y));
+    fn test_heading_to_point() {
+        assert_eq!((0.0, 1.0), (heading_to_point(0).x, heading_to_point(0).y));
         assert_eq!(
             (1.0, 0.0),
             (
-                heading_to_vector(90).x.trunc(),
-                heading_to_vector(90).y.trunc()
+                heading_to_point(90).x.trunc(),
+                heading_to_point(90).y.trunc()
             )
         );
         assert_eq!(
             (0.0, -1.0),
             (
-                heading_to_vector(180).x.trunc(),
-                heading_to_vector(180).y.trunc()
+                heading_to_point(180).x.trunc(),
+                heading_to_point(180).y.trunc()
             )
         );
         assert_eq!(
             (-1.0, 0.0),
             (
-                heading_to_vector(270).x.trunc(),
-                heading_to_vector(270).y.trunc()
+                heading_to_point(270).x.trunc(),
+                heading_to_point(270).y.trunc()
             )
         );
     }

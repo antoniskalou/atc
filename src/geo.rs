@@ -1,6 +1,8 @@
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::fmt::Display;
 
+use crate::geom::{Point, point_to_heading, point_distance};
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Cardinal {
     North,
@@ -130,6 +132,20 @@ impl LatLon {
         )
     }
 
+    pub fn from_game_world(origin: LatLon, offset: Point) -> Self {
+        let bearing = point_to_heading(offset);
+        let distance = point_distance(Point { x: 0.0, y: 0.0 }, offset);
+        origin.destination(bearing as f64, distance as f64)
+    }
+
+    pub fn to_game_world(&self, origin: &LatLon) -> Point {
+        let (x, y) = origin.distance_xy(&self);
+        Point {
+            x: x as f32,
+            y: y as f32,
+        }
+    }
+
     pub fn latitude(&self) -> f64 {
         self.lat
     }
@@ -142,17 +158,9 @@ impl LatLon {
         // FIXME: for some reason distance & azimuth aren't corrent unless a 4 tuple
         let (distance, azimuth, _, _) = 
             Geodesic::wgs84().inverse(self.lat, self.lon, other.lat, other.lon);
-        let p = crate::geom::heading_to_vector(azimuth.round() as i32);
+        let p = crate::geom::heading_to_point(azimuth.round() as i32);
         (p.x as f64 * distance, p.y as f64 * distance)
     }
-
-    // pub fn to_game_world(&self, origin: LatLon) -> Point {
-    //     let (x, y) = self.distance(origin);
-    //     Point {
-    //         x: x as f32,
-    //         y: y as f32,
-    //     }
-    // }
 
     /// Return a new latitude/longitude offset by a distance in meters and a bearing
     /// in degrees.
@@ -185,6 +193,45 @@ mod test {
     };
 
     #[test]
+    fn test_latlon_from_game_world() {
+        let offset = LatLon::from_game_world(LCPH, Point { x: 0.0, y: 100.0 });
+        let expected = LCPH.destination(0.0, 100.0);
+        assert_eq!(expected.latitude(), offset.latitude());
+        assert_eq!(expected.longitude(), offset.longitude());
+
+        let offset = LatLon::from_game_world(LCPH, Point { x: 100.0, y: 0.0 });
+        let expected = LCPH.destination(90.0, 100.0);
+        assert_eq!(expected.latitude().round(), offset.latitude().round());
+        assert_eq!(expected.longitude().round(), offset.longitude().round());
+    }
+
+    #[test]
+    fn test_latlon_to_game_world() {
+        let coord = LCPH.to_game_world(&LCPH);
+        assert_eq!(Point { x: 0.0, y: 0.0 }, coord);
+
+        let coord = LCPH.destination(0.0, 100.0).to_game_world(&LCPH);
+        assert_eq!(0.0, coord.x.round());
+        assert_eq!(100.0, coord.y.round());
+
+        let coord = LCPH.destination(45.0, 100.0).to_game_world(&LCPH);
+        assert_eq!(71.0, coord.x.round());
+        assert_eq!(71.0, coord.y.round());
+
+        let coord = LCPH.destination(90.0, 100.0).to_game_world(&LCPH);
+        assert_eq!(100.0, coord.x.round());
+        assert_eq!(0.0, coord.y.round());
+
+        let coord = LCPH.destination(180.0, 100.0).to_game_world(&LCPH);
+        assert_eq!(0.0, coord.x.round());
+        assert_eq!(-100.0, coord.y.round());
+
+        let coord = LCPH.destination(270.0, 100.0).to_game_world(&LCPH);
+        assert_eq!(-100.0, coord.x.round());
+        assert_eq!(0.0, coord.y.round());
+    }
+
+    #[test]
     fn test_latlon_destination() {
         let distance = (120.0 * NM2KM) * 1000.0;
         let dest = LCPH.destination(54.0, distance);
@@ -204,12 +251,20 @@ mod test {
         assert_eq!(0.0, LCPH.distance_xy(&dest).0.round());
         assert_eq!(10.0, LCPH.distance_xy(&dest).1.round());
 
+        let dest = LCPH.destination(45.0, 10.0);
+        assert_eq!(7.0, LCPH.distance_xy(&dest).0.round());
+        assert_eq!(7.0, LCPH.distance_xy(&dest).1.round());
+
         let dest = LCPH.destination(90.0, 10.0);
         assert_eq!(10.0, LCPH.distance_xy(&dest).0.round());
         assert_eq!(0.0, LCPH.distance_xy(&dest).1.round());
 
-        let dest = LCPH.destination(45.0, 10.0);
-        assert_eq!(7.0, LCPH.distance_xy(&dest).0.round());
-        assert_eq!(7.0, LCPH.distance_xy(&dest).1.round());
+        let dest = LCPH.destination(180.0, 10.0);
+        assert_eq!(0.0, LCPH.distance_xy(&dest).0.round());
+        assert_eq!(-10.0, LCPH.distance_xy(&dest).1.round());
+
+        let dest = LCPH.destination(270.0, 10.0);
+        assert_eq!(-10.0, LCPH.distance_xy(&dest).0.round());
+        assert_eq!(0.0, LCPH.distance_xy(&dest).1.round());
     }
 }

@@ -5,7 +5,7 @@ mod command;
 mod geo;
 mod geom;
 mod math;
-mod msfs;
+// mod msfs;
 mod tts;
 
 use crate::aircraft::*;
@@ -172,7 +172,7 @@ impl EventHandler<ggez::GameError> for Game {
                 let speed_change = (aircraft.speed.current(dt) * dt) / speed_scale;
 
                 let heading = aircraft.heading.current(dt);
-                let heading = heading_to_vector(heading as i32);
+                let heading = heading_to_point(heading as i32);
                 aircraft.position.x += speed_change * heading.x;
                 aircraft.position.y += speed_change * heading.y;
 
@@ -389,3 +389,28 @@ fn main() {
     let game = Game::new(&mut ctx);
     event::run(ctx, event_loop, game);
 }
+
+// fn main() {
+//     use msfs::sim_connect::SimConnect;
+
+//     // 10m left of paphos airport, simulate missed approach
+//     let paphos = LatLon::new(34.714296, 32.497588).destination(290.0, 8000.0);
+//     let mut sim = SimConnect::open("ATC", |_sim, recv| println!("SimConnect: {:?}", recv))
+//         .expect("failed to open simconnect connection");
+//     let init_position = msfs::sim_connect::InitPosition {
+//         Airspeed: 100,
+//         Altitude: 500.0,
+//         Bank: 0.0,
+//         Heading: 110.0,
+//         Latitude: paphos.latitude(),
+//         Longitude: paphos.longitude(),
+//         OnGround: 0,
+//         Pitch: 0.0,
+//     };
+//     sim.ai_create_non_atc_aircraft("Just Flight 146-200QT TNT Old", "5B-AKC", init_position, 0).unwrap();
+
+//     loop {
+//         sim.call_dispatch().unwrap();
+//         std::thread::sleep(std::time::Duration::from_secs(1));
+//     }
+// }
