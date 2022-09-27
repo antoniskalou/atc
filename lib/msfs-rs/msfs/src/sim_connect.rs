@@ -404,6 +404,35 @@ impl<'a> SimConnect<'a> {
         Ok(())
     }
 
+    pub fn ai_create_enroute_atc_aircraft(
+        &mut self,
+        container_title: &str,
+        tail_number: &str,
+        flight_number: i32,
+        flight_plan_path: &str,
+        flight_plan_position: f64,
+        touch_and_go: bool,
+        request_id: sys::SIMCONNECT_DATA_REQUEST_ID,
+    ) -> Result<()> {
+        let container_title = std::ffi::CString::new(container_title).unwrap();
+        let tail_number = std::ffi::CString::new(tail_number).unwrap();
+        let flight_plan_path = std::ffi::CString::new(flight_plan_path).unwrap();
+
+        unsafe {
+            map_err(sys::SimConnect_AICreateEnrouteATCAircraft(
+                self.handle, 
+                container_title.as_ptr(), 
+                tail_number.as_ptr(), 
+                flight_number, 
+                flight_plan_path.as_ptr(), 
+                flight_plan_position, 
+                touch_and_go as i32, 
+                request_id
+            ))?;
+        }
+        Ok(())
+    }
+
     pub fn ai_create_non_atc_aircraft(
         &mut self,
         container_title: &str,
@@ -476,6 +505,25 @@ impl<'a> SimConnect<'a> {
                 request_id,
             ))?;
         }
+        Ok(())
+    }
+
+    pub fn ai_set_aircraft_flight_plan(
+        &mut self,
+        object_id: sys::SIMCONNECT_OBJECT_ID,
+        flight_plan_path: &str,
+        request_id: sys::SIMCONNECT_DATA_REQUEST_ID,
+    ) -> Result<()> {
+        let flight_plan_path = std::ffi::CString::new(flight_plan_path).unwrap();
+
+        unsafe {
+            map_err(sys::SimConnect_AISetAircraftFlightPlan(
+                self.handle, 
+                object_id, 
+                flight_plan_path.as_ptr(), 
+                request_id
+            ))?;
+        };
         Ok(())
     }
 

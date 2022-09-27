@@ -9,3 +9,6 @@
 - Integrate with MSFS
     - Find lat/long for airport being used
     - Add AI aircraft
+
+# MSFS
+- Can't use waypoints (AI_CreateEnrouteAircraft) as they're not updated correctly, aircraft speed is wrong.

@@ -8,6 +8,8 @@ mod math;
 // mod msfs;
 mod tts;
 
+use std::io::Write;
+
 use crate::aircraft::*;
 use crate::atc::*;
 use crate::cli::*;
@@ -19,6 +21,7 @@ use ggez::{
     graphics::{self, Color},
     timer, Context, ContextBuilder, GameResult,
 };
+use msfs::sim_connect::SimConnect;
 
 const TTS_ENABLED: bool = false;
 
@@ -390,29 +393,100 @@ impl EventHandler<ggez::GameError> for Game {
 //     event::run(ctx, event_loop, game);
 // }
 
-fn main() {
-    use msfs::sim_connect::SimConnect;
+use msfs::sim_connect::data_definition;
 
-    // 10m left of paphos airport, simulate missed approach
-    let paphos = LatLon::new(34.714296, 32.497588).destination(290.0, 8000.0);
-    let mut sim = SimConnect::open("ATC", |_sim, recv| println!("SimConnect: {:?}", recv))
-        .expect("failed to open simconnect connection");
+#[data_definition]
+#[derive(Clone, Debug)]
+struct AIPlane {
+    #[name = "PLANE ALTITUDE"]
+    #[unit = "ft"]
+    altitude: f64,
+    #[name = "PLANE HEADING DEGREES MAGNETIC"]
+    #[unit = "radians"]
+    heading: f64,
+    #[name = "AIRSPEED INDICATED"]
+    #[unit = "knots"]
+    airspeed: f64,
+}
+
+enum EventID {
+    ADDED_AIRCRAFT = 0,
+    REMOVED_AIRCRAFT = 1,
+}
+
+fn main() {
+    use msfs::sim_connect::{SimConnect, SimConnectRecv};
+    use std::cell::RefCell;
+
+    let request_id = 10;
+    let object_id = RefCell::new(None);
+    let plane_data = RefCell::new(None);
+
+    let paphos = LatLon::new(34.714296, 32.497588); // .destination(110., 50_000.0);
+    let mut sim = SimConnect::open("ATC", |sim, recv| { 
+        println!("SimConnect: {:?}", recv);
+        match recv {
+            SimConnectRecv::SimObjectData(event) => {
+                if event.dwRequestID == 3232 {
+                    let data = event.into::<AIPlane>(sim).unwrap();
+                    println!("Received sim data: {:?}", data);
+                    *plane_data.borrow_mut() = Some(data.clone());
+                }
+            }
+            SimConnectRecv::AssignedObjectId(obj) => {
+                if obj.dwRequestID == request_id {
+                    *object_id.borrow_mut() = Some(obj.dwObjectID);
+                }
+            }
+            _ => {}
+        }
+    }).expect("failed to open simconnect connection");
+
     let init_position = msfs::sim_connect::InitPosition {
-        Airspeed: 100,
-        Altitude: 500.0,
+        Airspeed: 140,
+        Altitude: 250.0,
         Bank: 0.0,
-        Heading: 110.0,
+        Heading: 300.0,
         Latitude: paphos.latitude(),
         Longitude: paphos.longitude(),
-        OnGround: 0,
+        OnGround: 1,
         Pitch: 0.0,
     };
-    sim.ai_create_non_atc_aircraft("Just Flight 146-200QT TNT Old", "5B-AKC", init_position, 0).unwrap();
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    sim.ai_release_control(object_id, 0);
+    sim.ai_create_non_atc_aircraft(
+        "PMDG 737-700 Transavia", "5B-AKC", init_position, request_id
+    ).unwrap();
 
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    let freeze_altitude = sim.map_client_event_to_sim_event("FREEZE_ALTITUDE_SET", false).unwrap();
+
+    let mut is_released = false;
+
+    let mut alt = 200.0;
+    let mut airspeed = 140.0;
+    let mut heading: f64 = 290.0;
     loop {
         sim.call_dispatch().unwrap();
+
+        if let Some(oid) = *object_id.borrow() {
+            println!("Received object ID: {}", oid);
+
+            if !is_released {
+                println!("Releasing aircraft...");
+                sim.ai_release_control(oid, 100).unwrap();
+                println!("Freezing altitude...");
+                sim.transmit_client_event(oid, freeze_altitude, 1).unwrap();
+                sim.request_data_on_sim_object::<AIPlane>(3232, oid, msfs::sim_connect::Period::SimFrame).unwrap();
+                
+                is_released = true;
+            }
+
+            let new_data = AIPlane { altitude: alt, heading: heading.to_radians(), airspeed: airspeed };
+            sim.set_data_on_sim_object(oid, &new_data).unwrap();
+            alt = math::clamp(alt + 25.0, 0.0, 2000.0);
+            airspeed = math::clamp(airspeed + 1.0, 0.0, 180.0);
+            heading -= 2.0;
+        }
+
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
