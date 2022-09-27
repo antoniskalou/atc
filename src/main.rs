@@ -399,7 +399,7 @@ use msfs::sim_connect::data_definition;
 #[derive(Clone, Debug)]
 struct AIPlane {
     #[name = "PLANE ALTITUDE"]
-    #[unit = "ft"]
+    #[unit = "feet"]
     altitude: f64,
     #[name = "PLANE HEADING DEGREES MAGNETIC"]
     #[unit = "radians"]
@@ -409,30 +409,17 @@ struct AIPlane {
     airspeed: f64,
 }
 
-enum EventID {
-    ADDED_AIRCRAFT = 0,
-    REMOVED_AIRCRAFT = 1,
-}
-
 fn main() {
     use msfs::sim_connect::{SimConnect, SimConnectRecv};
     use std::cell::RefCell;
 
     let request_id = 10;
     let object_id = RefCell::new(None);
-    let plane_data = RefCell::new(None);
 
     let paphos = LatLon::new(34.714296, 32.497588); // .destination(110., 50_000.0);
     let mut sim = SimConnect::open("ATC", |sim, recv| { 
         println!("SimConnect: {:?}", recv);
         match recv {
-            SimConnectRecv::SimObjectData(event) => {
-                if event.dwRequestID == 3232 {
-                    let data = event.into::<AIPlane>(sim).unwrap();
-                    println!("Received sim data: {:?}", data);
-                    *plane_data.borrow_mut() = Some(data.clone());
-                }
-            }
             SimConnectRecv::AssignedObjectId(obj) => {
                 if obj.dwRequestID == request_id {
                     *object_id.borrow_mut() = Some(obj.dwObjectID);
@@ -457,7 +444,6 @@ fn main() {
     ).unwrap();
 
     std::thread::sleep(std::time::Duration::from_secs(1));
-    let freeze_altitude = sim.map_client_event_to_sim_event("FREEZE_ALTITUDE_SET", false).unwrap();
 
     let mut is_released = false;
 
@@ -473,9 +459,7 @@ fn main() {
             if !is_released {
                 println!("Releasing aircraft...");
                 sim.ai_release_control(oid, 100).unwrap();
-                println!("Freezing altitude...");
-                sim.transmit_client_event(oid, freeze_altitude, 1).unwrap();
-                sim.request_data_on_sim_object::<AIPlane>(3232, oid, msfs::sim_connect::Period::SimFrame).unwrap();
+                // sim.request_data_on_sim_object::<AIPlane>(3232, oid, msfs::sim_connect::Period::SimFrame).unwrap();
                 
                 is_released = true;
             }
