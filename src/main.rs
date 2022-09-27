@@ -5,7 +5,7 @@ mod command;
 mod geo;
 mod geom;
 mod math;
-// mod msfs;
+mod msfs_integration;
 mod tts;
 
 use std::io::Write;
@@ -21,7 +21,6 @@ use ggez::{
     graphics::{self, Color},
     timer, Context, ContextBuilder, GameResult,
 };
-use msfs::sim_connect::SimConnect;
 
 const TTS_ENABLED: bool = false;
 
@@ -48,7 +47,8 @@ const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 struct Game {
     atc: Atc,
     cli: CliPrompt,
-    airports: Vec<Airport>,
+    msfs: msfs_integration::MSFS,
+    airport: Airport,
     selected_aircraft: Option<usize>,
     aircraft: Vec<Aircraft>,
 }
@@ -66,12 +66,13 @@ impl Game {
         Self {
             atc: Atc::new(TTS_ENABLED),
             cli: CliPrompt::new(String::from("ATC>")),
-            airports: vec![Airport {
+            msfs: msfs_integration::MSFS::new().unwrap(),
+            airport: Airport {
                 position: Point { x: 0.0, y: 0.0 },
                 icao_code: "LCPH".into(),
                 takeoff_runways: vec![runway_29.clone()],
                 landing_runways: vec![runway_29.clone()],
-            }],
+            },
             selected_aircraft: None,
             aircraft: vec![
                 Aircraft {
@@ -184,20 +185,18 @@ impl EventHandler<ggez::GameError> for Game {
 
             if aircraft.cleared_to_land() {
                 // super inefficient
-                for airport in &self.airports {
-                    for runway in &airport.landing_runways {
-                        let origin = airport.origin(runway);
-                        let ils = runway.ils(origin);
+                for runway in &self.airport.landing_runways {
+                    let origin = self.airport.origin(runway);
+                    let ils = runway.ils(origin);
 
-                        if runway.has_landed(origin, aircraft) {
-                            aircraft.status = AircraftStatus::Landed;
-                        } else if aircraft.is_localizer_captured(&ils) {
-                            aircraft.status = AircraftStatus::Landing;
-                            aircraft.change_heading(runway.heading as i32, None);
+                    if runway.has_landed(origin, aircraft) {
+                        aircraft.status = AircraftStatus::Landed;
+                    } else if aircraft.is_localizer_captured(&ils) {
+                        aircraft.status = AircraftStatus::Landing;
+                        aircraft.change_heading(runway.heading as i32, None);
 
-                            let expected_alt = ils.altitude(aircraft.position);
-                            aircraft.change_altitude(expected_alt);
-                        }
+                        let expected_alt = ils.altitude(aircraft.position);
+                        aircraft.change_altitude(expected_alt);
                     }
                 }
             }
@@ -251,39 +250,37 @@ impl EventHandler<ggez::GameError> for Game {
 
         let screen_size = graphics::screen_coordinates(ctx);
 
-        for airport in &self.airports {
-            let icao_text = graphics::Text::new(airport.icao_code.clone());
-            graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
-            graphics::draw_queued_text(
+        let icao_text = graphics::Text::new(self.airport.icao_code.clone());
+        graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
+        graphics::draw_queued_text(
+            ctx,
+            graphics::DrawParam::new().dest(world_to_screen_coords(
+                screen_size.w,
+                screen_size.h,
+                self.airport.position,
+            )),
+            None,
+            graphics::FilterMode::Linear,
+        )?;
+
+        for runway in &self.airport.landing_runways {
+            let origin = self.airport.origin(runway);
+            let mesh = runway.as_mesh(ctx, origin, Color::RED)?;
+            graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
+
+            let ils = runway
+                .ils(origin)
+                .as_triangle()
+                .iter()
+                .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone()))
+                .collect::<Vec<Point>>();
+            let mesh = graphics::Mesh::new_polygon(
                 ctx,
-                graphics::DrawParam::new().dest(world_to_screen_coords(
-                    screen_size.w,
-                    screen_size.h,
-                    airport.position,
-                )),
-                None,
-                graphics::FilterMode::Linear,
+                graphics::DrawMode::stroke(2.0),
+                &ils,
+                Color::BLUE,
             )?;
-
-            for runway in &airport.landing_runways {
-                let origin = airport.origin(runway);
-                let mesh = runway.as_mesh(ctx, origin, Color::RED)?;
-                graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
-
-                let ils = runway
-                    .ils(origin)
-                    .as_triangle()
-                    .iter()
-                    .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone()))
-                    .collect::<Vec<Point>>();
-                let mesh = graphics::Mesh::new_polygon(
-                    ctx,
-                    graphics::DrawMode::stroke(2.0),
-                    &ils,
-                    Color::BLUE,
-                )?;
-                graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
-            }
+            graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
         }
 
         for aircraft in &self.aircraft {
@@ -382,95 +379,79 @@ impl EventHandler<ggez::GameError> for Game {
     }
 }
 
-// fn main() {
-//     let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
-//         .window_setup(ggez::conf::WindowSetup::default().title("ATC Simulator 2022"))
-//         .window_mode(ggez::conf::WindowMode::default().dimensions(1600.0, 1200.0))
-//         .build()
-//         .expect("Could not create ggez context");
-
-//     let game = Game::new(&mut ctx);
-//     event::run(ctx, event_loop, game);
-// }
-
-use msfs::sim_connect::data_definition;
-
-#[data_definition]
-#[derive(Clone, Debug)]
-struct AIPlane {
-    #[name = "PLANE ALTITUDE"]
-    #[unit = "feet"]
-    altitude: f64,
-    #[name = "PLANE HEADING DEGREES MAGNETIC"]
-    #[unit = "radians"]
-    heading: f64,
-    #[name = "AIRSPEED INDICATED"]
-    #[unit = "knots"]
-    airspeed: f64,
-}
-
 fn main() {
-    use msfs::sim_connect::{SimConnect, SimConnectRecv};
-    use std::cell::RefCell;
+    let (mut ctx, event_loop) = ContextBuilder::new("atc", "Antonis Kalou")
+        .window_setup(ggez::conf::WindowSetup::default().title("ATC Simulator 2022"))
+        .window_mode(ggez::conf::WindowMode::default().dimensions(1600.0, 1200.0))
+        .build()
+        .expect("Could not create ggez context");
 
-    let request_id = 10;
-    let object_id = RefCell::new(None);
-
-    let paphos = LatLon::new(34.714296, 32.497588); // .destination(110., 50_000.0);
-    let mut sim = SimConnect::open("ATC", |sim, recv| { 
-        println!("SimConnect: {:?}", recv);
-        match recv {
-            SimConnectRecv::AssignedObjectId(obj) => {
-                if obj.dwRequestID == request_id {
-                    *object_id.borrow_mut() = Some(obj.dwObjectID);
-                }
-            }
-            _ => {}
-        }
-    }).expect("failed to open simconnect connection");
-
-    let init_position = msfs::sim_connect::InitPosition {
-        Airspeed: 140,
-        Altitude: 250.0,
-        Bank: 0.0,
-        Heading: 300.0,
-        Latitude: paphos.latitude(),
-        Longitude: paphos.longitude(),
-        OnGround: 1,
-        Pitch: 0.0,
-    };
-    sim.ai_create_non_atc_aircraft(
-        "PMDG 737-700 Transavia", "5B-AKC", init_position, request_id
-    ).unwrap();
-
-    std::thread::sleep(std::time::Duration::from_secs(1));
-
-    let mut is_released = false;
-
-    let mut alt = 200.0;
-    let mut airspeed = 140.0;
-    let mut heading: f64 = 290.0;
-    loop {
-        sim.call_dispatch().unwrap();
-
-        if let Some(oid) = *object_id.borrow() {
-            println!("Received object ID: {}", oid);
-
-            if !is_released {
-                println!("Releasing aircraft...");
-                sim.ai_release_control(oid, 100).unwrap();
-                // sim.request_data_on_sim_object::<AIPlane>(3232, oid, msfs::sim_connect::Period::SimFrame).unwrap();
-                
-                is_released = true;
-            }
-
-            let new_data = AIPlane { altitude: alt, heading: heading.to_radians(), airspeed: airspeed };
-            sim.set_data_on_sim_object(oid, &new_data).unwrap();
-            alt = math::clamp(alt + 25.0, 0.0, 2000.0);
-            airspeed = math::clamp(airspeed + 1.0, 0.0, 180.0);
-            heading -= 2.0;
-        }
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
+    let game = Game::new(&mut ctx);
+    event::run(ctx, event_loop, game);
 }
+
+// fn main() {
+//     use msfs::sim_connect::{SimConnect, SimConnectRecv};
+//     use std::cell::RefCell;
+
+//     let request_id = 10;
+//     let object_id = RefCell::new(None);
+
+//     let paphos = LatLon::new(34.714296, 32.497588); // .destination(110., 50_000.0);
+//     let mut sim = SimConnect::open("ATC", |sim, recv| { 
+//         println!("SimConnect: {:?}", recv);
+//         match recv {
+//             SimConnectRecv::AssignedObjectId(obj) => {
+//                 if obj.dwRequestID == request_id {
+//                     *object_id.borrow_mut() = Some(obj.dwObjectID);
+//                 }
+//             }
+//             _ => {}
+//         }
+//     }).expect("failed to open simconnect connection");
+
+//     let init_position = msfs::sim_connect::InitPosition {
+//         Airspeed: 140,
+//         Altitude: 250.0,
+//         Bank: 0.0,
+//         Heading: 300.0,
+//         Latitude: paphos.latitude(),
+//         Longitude: paphos.longitude(),
+//         OnGround: 0,
+//         Pitch: 0.0,
+//     };
+//     sim.ai_create_non_atc_aircraft(
+//         "PMDG 737-700 Transavia", "5B-AKC", init_position, request_id
+//     ).unwrap();
+
+//     std::thread::sleep(std::time::Duration::from_secs(1));
+
+//     let mut is_released = false;
+
+//     let mut alt = 200.0;
+//     let mut airspeed = 140.0;
+//     let mut heading: f64 = 290.0;
+//     loop {
+//         sim.call_dispatch().unwrap();
+
+//         if let Some(oid) = *object_id.borrow() {
+//             println!("Received object ID: {}", oid);
+
+//             if !is_released {
+//                 println!("Releasing aircraft...");
+//                 sim.ai_release_control(oid, 100).unwrap();
+//                 // sim.request_data_on_sim_object::<AIPlane>(3232, oid, msfs::sim_connect::Period::SimFrame).unwrap();
+                
+//                 is_released = true;
+//             }
+
+//             let new_data = msfs_integration::AIPlane { altitude: alt, heading: heading.to_radians(), airspeed: airspeed };
+//             sim.set_data_on_sim_object(oid, &new_data).unwrap();
+//             alt = math::clamp(alt + 25.0, 0.0, 2000.0);
+//             airspeed = math::clamp(airspeed + 1.0, 0.0, 180.0);
+//             heading -= 2.0;
+//         }
+
+//         std::thread::sleep(std::time::Duration::from_secs(1));
+//     }
+// }
