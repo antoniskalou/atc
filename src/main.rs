@@ -9,6 +9,8 @@ mod msfs_integration;
 mod tts;
 
 use std::io::Write;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 use crate::aircraft::*;
 use crate::atc::*;
@@ -50,7 +52,7 @@ struct Game {
     msfs: msfs_integration::MSFS,
     airport: Airport,
     selected_aircraft: Option<usize>,
-    aircraft: Vec<Aircraft>,
+    aircraft: Arc<RwLock<Vec<Aircraft>>>,
 }
 
 impl Game {
@@ -63,7 +65,7 @@ impl Game {
             width: 35,
             ils_max_altitude: 2000,
         };
-        let aircraft = vec![
+        let aircraft = Arc::new(RwLock::new(vec![
                 Aircraft {
                     position: ggez::mint::Point2 {
                         x: -100.0,
@@ -111,7 +113,7 @@ impl Game {
                     status: AircraftStatus::Flight,
                     cleared_to_land: false,
                 },
-            ];
+            ]));
 
         Self {
             atc: Atc::new(TTS_ENABLED),
@@ -137,13 +139,15 @@ impl EventHandler<ggez::GameError> for Game {
             for cmd in CliCommand::from_string(msg) {
                 match cmd {
                     CliCommand::Atc(atc_cmd) => {
+                        let mut aircraft = self.aircraft.write().unwrap();
                         self.selected_aircraft.map(|sel| {
                             self.atc
-                                .command(&mut self.cli, &mut self.aircraft[sel], atc_cmd);
+                                .command(&mut self.cli, &mut aircraft[sel], atc_cmd);
                         });
                     }
                     CliCommand::Comm(CommCommand::ListAircraft) => {
-                        for (idx, aircraft) in self.aircraft.iter().enumerate() {
+                        let aircraft = self.aircraft.read().unwrap();
+                        for (idx, aircraft) in aircraft.iter().enumerate() {
                             self.cli
                                 .output(format!("{}: {}", idx, aircraft.callsign.coded()));
                         }
@@ -152,7 +156,8 @@ impl EventHandler<ggez::GameError> for Game {
                         self.cli
                             .output(format!("Changing aircraft to {}", callsign));
 
-                        match aircraft_by_callsign(callsign.clone(), &self.aircraft) {
+                        let aircraft = self.aircraft.read().unwrap();
+                        match aircraft_by_callsign(callsign.clone(), &aircraft) {
                             Some((idx, aircraft)) => {
                                 self.cli
                                     .output(format!("Now speaking to {}", aircraft.callsign));
@@ -171,7 +176,8 @@ impl EventHandler<ggez::GameError> for Game {
         }
         self.cli.flush();
 
-        for mut aircraft in &mut self.aircraft {
+        let mut aircraft = self.aircraft.write().unwrap();
+        for mut aircraft in &mut aircraft.iter_mut() {
             if !aircraft.is_grounded() {
                 // FIXME: use scale in meters
                 let speed_scale = 50.0;
@@ -204,11 +210,11 @@ impl EventHandler<ggez::GameError> for Game {
             }
         }
 
-        let aircraft = self.aircraft.clone(); // need to clone for lifetimes
         let old_selection = self.selected_aircraft.and_then(|idx| aircraft.get(idx));
+        let mut aircraft = aircraft.clone(); // need to clone for lifetimes
 
         // remove landed aircraft
-        self.aircraft.retain(|a| !a.is_grounded());
+        aircraft.retain(|a| !a.is_grounded());
 
         // set to previously selected item, if exists
         self.selected_aircraft = old_selection
@@ -229,7 +235,7 @@ impl EventHandler<ggez::GameError> for Game {
                 Some((self.selected_aircraft.unwrap_or(0) as i32 - 1).max(0) as usize);
         } else if keycode == KeyCode::RBracket {
             self.selected_aircraft =
-                Some((self.selected_aircraft.unwrap_or(0) + 1).min(self.aircraft.len() - 1));
+                Some((self.selected_aircraft.unwrap_or(0) + 1).min(self.aircraft.read().unwrap().len() - 1));
         }
     }
 
@@ -238,7 +244,7 @@ impl EventHandler<ggez::GameError> for Game {
         if button == MouseButton::Left {
             let click_pos = Point { x, y };
 
-            for (i, aircraft) in self.aircraft.iter().enumerate() {
+            for (i, aircraft) in self.aircraft.read().unwrap().iter().enumerate() {
                 if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_BOUNDING_RADIUS) {
                     self.selected_aircraft = Some(i);
                     break;
@@ -251,6 +257,7 @@ impl EventHandler<ggez::GameError> for Game {
         graphics::clear(ctx, Color::BLACK);
 
         let screen_size = graphics::screen_coordinates(ctx);
+        let aircraft = self.aircraft.read().unwrap();
 
         let icao_text = graphics::Text::new(self.airport.icao_code.clone());
         graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
@@ -285,7 +292,7 @@ impl EventHandler<ggez::GameError> for Game {
             graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
         }
 
-        for aircraft in &self.aircraft {
+        for aircraft in aircraft.iter() {
             let pos = world_to_screen_coords(screen_size.w, screen_size.h, aircraft.position);
             let aircraft_rect = graphics::Mesh::new_rectangle(
                 ctx,
@@ -360,7 +367,7 @@ impl EventHandler<ggez::GameError> for Game {
         let selected_aircraft_text = graphics::Text::new(format!(
             "SELECTED: {}",
             self.selected_aircraft
-                .and_then(|idx| self.aircraft.get(idx))
+                .and_then(|idx| aircraft.get(idx))
                 .map(|a| a.callsign.coded())
                 .unwrap_or(String::from("None"))
         ));
