@@ -55,6 +55,7 @@ struct Game {
 
 impl Game {
     pub fn new(_ctx: &mut Context) -> Self {
+        let paphos = LatLon::new(34.714296, 32.497588);
         let runway_29 = Runway {
             offset: Point { x: 0.0, y: 0.0 },
             heading: 290,
@@ -62,19 +63,7 @@ impl Game {
             width: 35,
             ils_max_altitude: 2000,
         };
-
-        Self {
-            atc: Atc::new(TTS_ENABLED),
-            cli: CliPrompt::new(String::from("ATC>")),
-            msfs: msfs_integration::MSFS::new().unwrap(),
-            airport: Airport {
-                position: Point { x: 0.0, y: 0.0 },
-                icao_code: "LCPH".into(),
-                takeoff_runways: vec![runway_29.clone()],
-                landing_runways: vec![runway_29.clone()],
-            },
-            selected_aircraft: None,
-            aircraft: vec![
+        let aircraft = vec![
                 Aircraft {
                     position: ggez::mint::Point2 {
                         x: -100.0,
@@ -122,7 +111,20 @@ impl Game {
                     status: AircraftStatus::Flight,
                     cleared_to_land: false,
                 },
-            ],
+            ];
+
+        Self {
+            atc: Atc::new(TTS_ENABLED),
+            cli: CliPrompt::new(String::from("ATC>")),
+            msfs: msfs_integration::MSFS::new(paphos, aircraft.clone()),
+            airport: Airport {
+                position: Point { x: 0.0, y: 0.0 },
+                icao_code: "LCPH".into(),
+                takeoff_runways: vec![runway_29.clone()],
+                landing_runways: vec![runway_29.clone()],
+            },
+            selected_aircraft: None,
+            aircraft,
         }
     }
 }
