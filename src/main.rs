@@ -66,54 +66,54 @@ impl Game {
             ils_max_altitude: 2000,
         };
         let aircraft = Arc::new(RwLock::new(vec![
-                Aircraft {
-                    position: ggez::mint::Point2 {
-                        x: -100.0,
-                        y: -200.0,
-                    },
-                    callsign: Callsign {
-                        name: "Cyprus Airways".into(),
-                        code: "CYP".into(),
-                        number: "2202".into(),
-                    },
-                    // heading: AircraftParameter::new(90.0),
-                    // FIXME
-                    heading: HeadingParameter::new(90.0),
-                    altitude: AircraftParameter::new(6000.0),
-                    speed: AircraftParameter::new(240.0),
-                    status: AircraftStatus::Flight,
-                    cleared_to_land: false,
+            Aircraft {
+                position: ggez::mint::Point2 {
+                    x: -100.0,
+                    y: -200.0,
                 },
-                Aircraft {
-                    position: ggez::mint::Point2 { x: 100.0, y: 300.0 },
-                    callsign: Callsign {
-                        name: "Fedex".into(),
-                        code: "FDX".into(),
-                        number: "261".into(),
-                    },
-                    heading: HeadingParameter::new(15.0),
-                    altitude: AircraftParameter::new(8000.0),
-                    speed: AircraftParameter::new(230.0),
-                    status: AircraftStatus::Flight,
-                    cleared_to_land: false,
+                callsign: Callsign {
+                    name: "Cyprus Airways".into(),
+                    code: "CYP".into(),
+                    number: "2202".into(),
                 },
-                Aircraft {
-                    position: ggez::mint::Point2 {
-                        x: 200.0,
-                        y: -400.0,
-                    },
-                    callsign: Callsign {
-                        name: "Transavia".into(),
-                        code: "TRA".into(),
-                        number: "1112".into(),
-                    },
-                    heading: HeadingParameter::new(180.0),
-                    altitude: AircraftParameter::new(4000.0),
-                    speed: AircraftParameter::new(220.0),
-                    status: AircraftStatus::Flight,
-                    cleared_to_land: false,
+                // heading: AircraftParameter::new(90.0),
+                // FIXME
+                heading: HeadingParameter::new(90.0),
+                altitude: AircraftParameter::new(6000.0),
+                speed: AircraftParameter::new(240.0),
+                status: AircraftStatus::Flight,
+                cleared_to_land: false,
+            },
+            Aircraft {
+                position: ggez::mint::Point2 { x: 10.0, y: 30.0 },
+                callsign: Callsign {
+                    name: "Fedex".into(),
+                    code: "FDX".into(),
+                    number: "261".into(),
                 },
-            ]));
+                heading: HeadingParameter::new(15.0),
+                altitude: AircraftParameter::new(8000.0),
+                speed: AircraftParameter::new(230.0),
+                status: AircraftStatus::Flight,
+                cleared_to_land: false,
+            },
+            Aircraft {
+                position: ggez::mint::Point2 {
+                    x: 200.0,
+                    y: -400.0,
+                },
+                callsign: Callsign {
+                    name: "Transavia".into(),
+                    code: "TRA".into(),
+                    number: "1112".into(),
+                },
+                heading: HeadingParameter::new(180.0),
+                altitude: AircraftParameter::new(4000.0),
+                speed: AircraftParameter::new(220.0),
+                status: AircraftStatus::Flight,
+                cleared_to_land: false,
+            },
+        ]));
 
         Self {
             atc: Atc::new(TTS_ENABLED),
@@ -141,8 +141,7 @@ impl EventHandler<ggez::GameError> for Game {
                     CliCommand::Atc(atc_cmd) => {
                         let mut aircraft = self.aircraft.write().unwrap();
                         self.selected_aircraft.map(|sel| {
-                            self.atc
-                                .command(&mut self.cli, &mut aircraft[sel], atc_cmd);
+                            self.atc.command(&mut self.cli, &mut aircraft[sel], atc_cmd);
                         });
                     }
                     CliCommand::Comm(CommCommand::ListAircraft) => {
@@ -234,8 +233,10 @@ impl EventHandler<ggez::GameError> for Game {
             self.selected_aircraft =
                 Some((self.selected_aircraft.unwrap_or(0) as i32 - 1).max(0) as usize);
         } else if keycode == KeyCode::RBracket {
-            self.selected_aircraft =
-                Some((self.selected_aircraft.unwrap_or(0) + 1).min(self.aircraft.read().unwrap().len() - 1));
+            self.selected_aircraft = Some(
+                (self.selected_aircraft.unwrap_or(0) + 1)
+                    .min(self.aircraft.read().unwrap().len() - 1),
+            );
         }
     }
 
@@ -398,69 +399,3 @@ fn main() {
     let game = Game::new(&mut ctx);
     event::run(ctx, event_loop, game);
 }
-
-// fn main() {
-//     use msfs::sim_connect::{SimConnect, SimConnectRecv};
-//     use std::cell::RefCell;
-
-//     let request_id = 10;
-//     let object_id = RefCell::new(None);
-
-//     let paphos = LatLon::new(34.714296, 32.497588); // .destination(110., 50_000.0);
-//     let mut sim = SimConnect::open("ATC", |sim, recv| { 
-//         println!("SimConnect: {:?}", recv);
-//         match recv {
-//             SimConnectRecv::AssignedObjectId(obj) => {
-//                 if obj.dwRequestID == request_id {
-//                     *object_id.borrow_mut() = Some(obj.dwObjectID);
-//                 }
-//             }
-//             _ => {}
-//         }
-//     }).expect("failed to open simconnect connection");
-
-//     let init_position = msfs::sim_connect::InitPosition {
-//         Airspeed: 140,
-//         Altitude: 250.0,
-//         Bank: 0.0,
-//         Heading: 300.0,
-//         Latitude: paphos.latitude(),
-//         Longitude: paphos.longitude(),
-//         OnGround: 0,
-//         Pitch: 0.0,
-//     };
-//     sim.ai_create_non_atc_aircraft(
-//         "PMDG 737-700 Transavia", "5B-AKC", init_position, request_id
-//     ).unwrap();
-
-//     std::thread::sleep(std::time::Duration::from_secs(1));
-
-//     let mut is_released = false;
-
-//     let mut alt = 200.0;
-//     let mut airspeed = 140.0;
-//     let mut heading: f64 = 290.0;
-//     loop {
-//         sim.call_dispatch().unwrap();
-
-//         if let Some(oid) = *object_id.borrow() {
-//             println!("Received object ID: {}", oid);
-
-//             if !is_released {
-//                 println!("Releasing aircraft...");
-//                 sim.ai_release_control(oid, 100).unwrap();
-//                 // sim.request_data_on_sim_object::<AIPlane>(3232, oid, msfs::sim_connect::Period::SimFrame).unwrap();
-                
-//                 is_released = true;
-//             }
-
-//             let new_data = msfs_integration::AIPlane { altitude: alt, heading: heading.to_radians(), airspeed: airspeed };
-//             sim.set_data_on_sim_object(oid, &new_data).unwrap();
-//             alt = math::clamp(alt + 25.0, 0.0, 2000.0);
-//             airspeed = math::clamp(airspeed + 1.0, 0.0, 180.0);
-//             heading -= 2.0;
-//         }
-
-//         std::thread::sleep(std::time::Duration::from_secs(1));
-//     }
-// }

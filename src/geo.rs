@@ -1,7 +1,7 @@
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::fmt::Display;
 
-use crate::geom::{Point, point_to_heading, point_distance};
+use crate::geom::{point_distance, point_to_heading, Point};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Cardinal {
@@ -107,6 +107,9 @@ impl Display for DMS {
     }
 }
 
+const KM2NM: f64 = 0.5399568;
+const NM2KM: f64 = 1.852;
+
 #[derive(Copy, Clone, Debug)]
 pub struct LatLon {
     lat: f64,
@@ -135,7 +138,10 @@ impl LatLon {
     pub fn from_game_world(origin: LatLon, offset: Point) -> Self {
         let bearing = point_to_heading(offset);
         let distance = point_distance(Point { x: 0.0, y: 0.0 }, offset);
-        origin.destination(bearing as f64, distance as f64)
+        // 1 world unit = 100m
+        let distance = distance as f64 * 100.0;
+        println!("distance: {}", distance);
+        origin.destination(bearing as f64, distance)
     }
 
     pub fn to_game_world(&self, origin: &LatLon) -> Point {
@@ -156,7 +162,7 @@ impl LatLon {
 
     pub fn distance_xy(&self, other: &LatLon) -> (f64, f64) {
         // FIXME: for some reason distance & azimuth aren't corrent unless a 4 tuple
-        let (distance, azimuth, _, _) = 
+        let (distance, azimuth, _, _) =
             Geodesic::wgs84().inverse(self.lat, self.lon, other.lat, other.lon);
         let p = crate::geom::heading_to_point(azimuth.round() as i32);
         (p.x as f64 * distance, p.y as f64 * distance)

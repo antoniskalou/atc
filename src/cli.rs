@@ -12,7 +12,8 @@ Enter commands below.
 
 #[derive(Debug)]
 pub struct CliPrompt {
-    #[allow(dead_code)] thread: std::thread::JoinHandle<()>,
+    #[allow(dead_code)]
+    thread: std::thread::JoinHandle<()>,
     input: Receiver<String>,
     output: Arc<(Mutex<BufWriter<io::Stdout>>, Condvar)>,
 }

@@ -1,6 +1,12 @@
-use crate::{aircraft::{Aircraft, self}, geo::LatLon};
-use msfs::sim_connect::{data_definition, SimConnect, InitPosition};
-use std::{collections::HashMap, sync::{Arc, Mutex, mpsc::{Receiver, self}, RwLock}, hash::Hash};
+use crate::{
+    aircraft::Aircraft,
+    geo::LatLon,
+};
+use msfs::sim_connect::{data_definition, InitPosition, SimConnect};
+use std::{
+    collections::HashMap,
+    sync::{mpsc, Arc, RwLock,},
+};
 
 const UPDATE_FREQUENCY_MS: u64 = 100;
 
@@ -40,38 +46,35 @@ impl GenRequestID {
 }
 
 #[derive(Debug)]
-pub struct MSFS {
-    thread: std::thread::JoinHandle<()>,
-    // sim: Pin<Box<SimConnect>>,
-    gen_request_id: GenRequestID,
-    // assigned_objects: Receiver<(RequestID, ObjectID)>,
-}
+pub struct MSFS;
 
 impl MSFS {
     pub fn new(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) -> Self {
-        let mut gen_request_id = GenRequestID::new();
-        let (oid_tx, oid_rx) = mpsc::channel();
-        let thread = std::thread::spawn(move || {
-            let mut sim = SimConnect::open("ATC", |_sim, recv| match recv { 
+        std::thread::spawn(move || {
+            let mut gen_request_id = GenRequestID::new();
+            let (oid_tx, oid_rx) = mpsc::channel();
+            let mut sim = SimConnect::open("ATC", |_sim, recv| match recv {
                 msfs::sim_connect::SimConnectRecv::AssignedObjectId(obj) => {
                     let request_id = obj.dwRequestID;
                     let object_id = obj.dwObjectID;
                     println!("Received rid: {}, oid: {}", request_id, object_id);
                     oid_tx.send((request_id, object_id)).unwrap();
                 }
-                _ => println!("SimConnect: {:?}", recv)
-            }).expect("failed to start simconnect");
-            
+                _ => println!("SimConnect: {:?}", recv),
+            })
+            .expect("failed to start simconnect");
+
             let mut aircraft_requests = HashMap::new();
             for aircraft in aircraft.read().unwrap().iter() {
                 let request_id = gen_request_id.unique();
                 let init_pos = aircraft_to_init_pos(origin, aircraft.clone());
                 sim.ai_create_non_atc_aircraft(
-                    "PMDG 737-700 Transavia", 
-                    &aircraft.callsign.coded(), 
+                    "PMDG 737-700 Transavia", // TODO: fetch model
+                    &aircraft.callsign.coded(),
                     init_pos,
                     request_id,
-                ).unwrap();
+                )
+                .unwrap();
                 aircraft_requests.insert(request_id, aircraft.callsign.clone());
             }
 
@@ -80,31 +83,38 @@ impl MSFS {
                 sim.call_dispatch().expect("call dispatch");
 
                 if let Ok((rid, oid)) = oid_rx.try_recv() {
-                    sim.ai_release_control(oid, gen_request_id.unique()).unwrap();
-                    
-                    let aircraft = aircraft_requests.get(&rid).unwrap();
-                    aircraft_objects.insert(oid, aircraft);
+                    if let Some(aircraft) = aircraft_requests.get(&rid) {
+                        sim.ai_release_control(oid, gen_request_id.unique())
+                            .unwrap();
+                        aircraft_objects.insert(oid, aircraft);
+                    }
                 }
 
                 for (oid, callsign) in &aircraft_objects {
                     let aircraft = aircraft.read().unwrap();
-                    let aircraft = aircraft.iter().find(|a| a.callsign == **callsign).unwrap();
-                    let simdata = AIPlane {
-                        altitude: aircraft.altitude.current as f64,
-                        heading: aircraft.heading.current.to_radians() as f64,
-                        airspeed: aircraft.speed.current as f64,
-                    };
-                    sim.set_data_on_sim_object(*oid, &simdata).unwrap();
+
+                    match aircraft.iter().find(|a| a.callsign == **callsign) {
+                        Some(simaircraft) => {
+                            let simdata = AIPlane {
+                                altitude: simaircraft.altitude.current as f64,
+                                heading: simaircraft.heading.current.to_radians() as f64,
+                                airspeed: simaircraft.speed.current as f64,
+                            };
+                            sim.set_data_on_sim_object(*oid, &simdata).unwrap();
+                        }
+                        // aircraft has been removed
+                        // FIXME: check not removing other processes objects
+                        None => {
+                            sim.ai_remove_object(*oid, gen_request_id.unique()).unwrap();
+                        }
+                    }
                 }
 
                 std::thread::sleep(std::time::Duration::from_millis(UPDATE_FREQUENCY_MS));
             }
         });
 
-        Self { 
-            thread, 
-            gen_request_id,
-        }
+        Self
     }
 }
 
@@ -119,12 +129,5 @@ fn aircraft_to_init_pos(origin: LatLon, aircraft: Aircraft) -> InitPosition {
         Longitude: latlon.longitude(),
         OnGround: 0,
         Pitch: 0.0,
-    }
-}
-
-fn flatten_option<T>(option: Option<Option<T>>) -> Option<T> {
-    match option {
-        None => None,
-        Some(v) => v,
     }
 }
