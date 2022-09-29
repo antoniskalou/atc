@@ -110,6 +110,7 @@ version = "0.1.0"
 dependencies = [
  "geographiclib-rs",
  "ggez",
+ "lazy_static",
  "mint",
  "msfs",
 ]

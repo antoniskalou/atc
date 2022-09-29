@@ -107,9 +107,6 @@ impl Display for DMS {
     }
 }
 
-const KM2NM: f64 = 0.5399568;
-const NM2KM: f64 = 1.852;
-
 #[derive(Copy, Clone, Debug)]
 pub struct LatLon {
     lat: f64,

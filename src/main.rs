@@ -8,7 +8,6 @@ mod math;
 mod msfs_integration;
 mod tts;
 
-use std::io::Write;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -23,11 +22,16 @@ use ggez::{
     graphics::{self, Color},
     timer, Context, ContextBuilder, GameResult,
 };
+use lazy_static::lazy_static;
 
 const TTS_ENABLED: bool = false;
 
 const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
+
+lazy_static! {
+    static ref PAPHOS_LATLON: LatLon = LatLon::new(33.714296, 32.497588);
+}
 
 // 34°43′06″N 32°29′06″E
 // const PAPHOS_LATLONG: LatLon = LatLon {
@@ -57,10 +61,9 @@ struct Game {
 
 impl Game {
     pub fn new(_ctx: &mut Context) -> Self {
-        let paphos = LatLon::new(34.714296, 32.497588);
         let runway_29 = Runway {
             offset: Point { x: 0.0, y: 0.0 },
-            heading: 290,
+            heading: 285,
             length: 1900,
             width: 35,
             ils_max_altitude: 2000,
