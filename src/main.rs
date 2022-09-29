@@ -118,7 +118,8 @@ impl Game {
         Self {
             atc: Atc::new(TTS_ENABLED),
             cli: CliPrompt::new(String::from("ATC>")),
-            msfs: msfs_integration::MSFS::new(paphos, aircraft.clone()),
+            // msfs: msfs_integration::MSFS::new(paphos, aircraft.clone()),
+            msfs: msfs_integration::MSFS,
             airport: Airport {
                 position: Point { x: 0.0, y: 0.0 },
                 icao_code: "LCPH".into(),

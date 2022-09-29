@@ -147,8 +147,8 @@ impl LatLon {
     pub fn to_game_world(&self, origin: &LatLon) -> Point {
         let (x, y) = origin.distance_xy(&self);
         Point {
-            x: x as f32,
-            y: y as f32,
+            x: x as f32 / 100.0,
+            y: y as f32 / 100.0,
         }
     }
 
@@ -200,7 +200,7 @@ mod test {
 
     #[test]
     fn test_latlon_from_game_world() {
-        let offset = LatLon::from_game_world(LCPH, Point { x: 0.0, y: 100.0 });
+        let offset = LatLon::from_game_world(LCPH, Point { x: 0.0, y: 1.0 });
         let expected = LCPH.destination(0.0, 100.0);
         assert_eq!(expected.latitude(), offset.latitude());
         assert_eq!(expected.longitude(), offset.longitude());
@@ -218,22 +218,22 @@ mod test {
 
         let coord = LCPH.destination(0.0, 100.0).to_game_world(&LCPH);
         assert_eq!(0.0, coord.x.round());
-        assert_eq!(100.0, coord.y.round());
+        assert_eq!(1.0, coord.y.round());
 
         let coord = LCPH.destination(45.0, 100.0).to_game_world(&LCPH);
-        assert_eq!(71.0, coord.x.round());
-        assert_eq!(71.0, coord.y.round());
+        assert_eq!(0.71, round_decimal(coord.x as f64, 2));
+        assert_eq!(0.71, round_decimal(coord.y as f64, 2));
 
         let coord = LCPH.destination(90.0, 100.0).to_game_world(&LCPH);
-        assert_eq!(100.0, coord.x.round());
+        assert_eq!(1.0, coord.x.round());
         assert_eq!(0.0, coord.y.round());
 
         let coord = LCPH.destination(180.0, 100.0).to_game_world(&LCPH);
         assert_eq!(0.0, coord.x.round());
-        assert_eq!(-100.0, coord.y.round());
+        assert_eq!(-1.0, coord.y.round());
 
         let coord = LCPH.destination(270.0, 100.0).to_game_world(&LCPH);
-        assert_eq!(-100.0, coord.x.round());
+        assert_eq!(-1.0, coord.x.round());
         assert_eq!(0.0, coord.y.round());
     }
 

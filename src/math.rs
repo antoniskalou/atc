@@ -39,7 +39,7 @@ pub fn sign(s: f32) -> f32 {
     }
 }
 
-/// Returns the inverse of the angle, in radians.
+/// Returns the inverse of the angle, in degrees.
 pub fn complement_angle(angle: f32) -> f32 {
     angle - 360.0 * sign(angle)
 }
