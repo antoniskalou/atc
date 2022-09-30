@@ -374,8 +374,8 @@ impl Runway {
     pub fn ils(&self, origin: Point) -> ILS {
         let origin = Point {
             // rotated runway line points
-            x: self.as_line(origin)[1].x,
-            y: self.as_line(origin)[1].y,
+            x: self.as_line(origin)[0].x,
+            y: self.as_line(origin)[0].y,
         };
         // note, state not automatically updated
         ILS {
