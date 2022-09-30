@@ -39,7 +39,16 @@ pub fn sign(s: f32) -> f32 {
     }
 }
 
-/// Returns the inverse of the angle, in degrees.
+// invert bearing, e.g. invert_bearing(90.0) == 270.0
+pub fn invert_bearing(angle: f32) -> f32 {
+    if angle >= 180.0 {
+        angle - 180.0
+    } else {
+        angle + 180.0
+    }
+}
+
+/// Returns the complement of the angle, in degrees.
 pub fn complement_angle(angle: f32) -> f32 {
     angle - 360.0 * sign(angle)
 }
@@ -121,6 +130,15 @@ mod test {
         assert_eq!(-1.0, sign(-6.0));
         assert_eq!(1.0, sign(10.0));
         assert_eq!(0.0, sign(0.0));
+    }
+
+    #[test]
+    fn test_invert_bearing() {
+        assert_eq!(0.0, invert_bearing(180.0));
+        assert_eq!(180.0, invert_bearing(0.0));
+        assert_eq!(180.0, invert_bearing(360.0));
+        assert_eq!(270.0, invert_bearing(90.0));
+        assert_eq!(105.0, invert_bearing(285.0));
     }
 
     #[test]

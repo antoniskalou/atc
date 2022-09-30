@@ -2,6 +2,7 @@ use crate::{
     aircraft::Aircraft,
     geo::LatLon,
 };
+use lazy_static::lazy_static;
 use msfs::sim_connect::{data_definition, InitPosition, SimConnect};
 use std::{
     collections::HashMap,
@@ -45,6 +46,10 @@ impl GenRequestID {
     }
 }
 
+lazy_static! {
+    static ref GEN_REQUEST_ID: GenRequestID = GenRequestID::new();
+}
+
 #[derive(Debug)]
 pub struct MSFS;
 
@@ -69,7 +74,7 @@ impl MSFS {
                 let request_id = gen_request_id.unique();
                 let init_pos = aircraft_to_init_pos(origin, aircraft.clone());
                 sim.ai_create_non_atc_aircraft(
-                    "PMDG 737-700 Transavia", // TODO: fetch model
+                    "PMDG 737-700BDSF FEDEX (G-NXTS - 2021) Fictional", // TODO: fetch model
                     &aircraft.callsign.coded(),
                     init_pos,
                     request_id,

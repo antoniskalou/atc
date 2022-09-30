@@ -137,7 +137,6 @@ impl LatLon {
         let distance = point_distance(Point { x: 0.0, y: 0.0 }, offset);
         // 1 world unit = 100m
         let distance = distance as f64 * 100.0;
-        println!("distance: {}", distance);
         origin.destination(bearing as f64, distance)
     }
 

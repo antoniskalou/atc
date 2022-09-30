@@ -319,7 +319,8 @@ impl ILS {
         rotate_points(
             self.origin,
             &localizer,
-            (self.runway.heading as f32).to_radians(),
+            // ILS bearing is opposite of runway
+            invert_bearing(self.runway.heading as f32).to_radians(),
         )
     }
 

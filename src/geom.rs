@@ -50,7 +50,13 @@ pub fn heading_to_point(heading: i32) -> Point {
 }
 
 pub fn point_to_heading(p: Point) -> i32 {
-    p.x.atan2(p.y).trunc() as i32
+    let diff = p.x.atan2(p.y).to_degrees() as i32;
+
+    if diff < 0 {
+        360 + diff
+    } else {
+        diff
+    }
 }
 
 /// Translates the world coordinate system, which
@@ -91,5 +97,18 @@ mod test {
                 heading_to_point(270).y.trunc()
             )
         );
+    }
+
+    #[test]
+    fn test_point_to_heading() {
+        assert_eq!(0, point_to_heading(Point { x: 0.0, y: 1.0 }));
+        assert_eq!(90, point_to_heading(Point { x: 1.0, y: 0.0 }));
+        assert_eq!(180, point_to_heading(Point { x: 0.0, y: -1.0 }));
+        assert_eq!(270, point_to_heading(Point { x: -1.0, y: 0.0 }));
+
+        assert_eq!(45, point_to_heading(Point { x: 1.0, y: 1.0 }));
+        assert_eq!(135, point_to_heading(Point { x: 1.0, y: -1.0 }));
+        assert_eq!(225, point_to_heading(Point { x: -1.0, y: -1.0 }));
+        assert_eq!(315, point_to_heading(Point { x: -1.0, y: 1.0 }));
     }
 }

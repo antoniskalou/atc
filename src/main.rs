@@ -30,24 +30,12 @@ const AIRCRAFT_RADIUS: f32 = 4.0;
 const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 
 lazy_static! {
-    static ref PAPHOS_LATLON: LatLon = LatLon::new(33.714296, 32.497588);
+    // 34° 43' 5.08" N 32° 29' 6.26" E
+    static ref PAPHOS_LATLON: LatLon = LatLon::from_dms(
+        DMS::new(34, 43, 5.08, Cardinal::North), 
+        DMS::new(32, 29, 6.26, Cardinal::East)
+    );
 }
-
-// 34°43′06″N 32°29′06″E
-// const PAPHOS_LATLONG: LatLon = LatLon {
-//     lat: DMS {
-//         degrees: 34,
-//         minutes: 43,
-//         seconds: 6.0,
-//         cardinal: Some(Cardinal::North),
-//     },
-//     lon: DMS {
-//         degrees: 32,
-//         minutes: 29,
-//         seconds: 6.0,
-//         cardinal: Some(Cardinal::East),
-//     },
-// };
 
 #[derive(Debug)]
 struct Game {
@@ -71,16 +59,14 @@ impl Game {
         let aircraft = Arc::new(RwLock::new(vec![
             Aircraft {
                 position: ggez::mint::Point2 {
-                    x: -100.0,
-                    y: -200.0,
+                    x: 0.0,
+                    y: 0.0,
                 },
                 callsign: Callsign {
                     name: "Cyprus Airways".into(),
                     code: "CYP".into(),
                     number: "2202".into(),
                 },
-                // heading: AircraftParameter::new(90.0),
-                // FIXME
                 heading: HeadingParameter::new(90.0),
                 altitude: AircraftParameter::new(6000.0),
                 speed: AircraftParameter::new(240.0),
@@ -88,22 +74,22 @@ impl Game {
                 cleared_to_land: false,
             },
             Aircraft {
-                position: ggez::mint::Point2 { x: 10.0, y: 30.0 },
+                position: ggez::mint::Point2 { x: 20.0, y: 30.0 },
                 callsign: Callsign {
                     name: "Fedex".into(),
                     code: "FDX".into(),
                     number: "261".into(),
                 },
                 heading: HeadingParameter::new(15.0),
-                altitude: AircraftParameter::new(8000.0),
-                speed: AircraftParameter::new(230.0),
+                altitude: AircraftParameter::new(2000.0),
+                speed: AircraftParameter::new(180.0),
                 status: AircraftStatus::Flight,
                 cleared_to_land: false,
             },
             Aircraft {
                 position: ggez::mint::Point2 {
-                    x: 200.0,
-                    y: -400.0,
+                    x: -200.0,
+                    y: -500.0,
                 },
                 callsign: Callsign {
                     name: "Transavia".into(),
@@ -121,8 +107,8 @@ impl Game {
         Self {
             atc: Atc::new(TTS_ENABLED),
             cli: CliPrompt::new(String::from("ATC>")),
-            // msfs: msfs_integration::MSFS::new(paphos, aircraft.clone()),
-            msfs: msfs_integration::MSFS,
+            msfs: msfs_integration::MSFS::new(*PAPHOS_LATLON, aircraft.clone()),
+            // msfs: msfs_integration::MSFS,
             airport: Airport {
                 position: Point { x: 0.0, y: 0.0 },
                 icao_code: "LCPH".into(),
