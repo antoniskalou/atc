@@ -46,6 +46,7 @@ struct Game {
     airport: Airport,
     selected_aircraft: Option<usize>,
     aircraft: Arc<RwLock<Vec<Aircraft>>>,
+    screen_scale: f32,
 }
 
 impl Game {
@@ -117,6 +118,8 @@ impl Game {
                 landing_runways: vec![runway_29.clone()],
             },
             selected_aircraft: None,
+            // 1m = 1/25 pixels
+            screen_scale: 1. / 25.,
             aircraft,
         }
     }
@@ -243,6 +246,11 @@ impl EventHandler<ggez::GameError> for Game {
         }
     }
 
+    fn mouse_wheel_event(&mut self, _ctx: &mut Context, _x: f32, y: f32) {
+        // scale 1/50 pixels each scroll
+        self.screen_scale = (self.screen_scale + 1. / 50. * y).max(0.02);
+    }
+
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, Color::BLACK);
 
@@ -250,7 +258,7 @@ impl EventHandler<ggez::GameError> for Game {
         let aircraft = self.aircraft.read().unwrap();
 
         // scale line uses screen coords
-        let scale_length = 1000. * geom::SCREEN_SCALE;
+        let scale_length = 1000. * self.screen_scale;
         let scale_points = [
             // uptick left
             Point { x: 0., y: -20.0 },
@@ -267,7 +275,7 @@ impl EventHandler<ggez::GameError> for Game {
         graphics::queue_text(
             ctx,
             &scale_text,
-            Point { x: 20.0, y: screen_size.h - 30. },
+            Point { x: 10.0, y: screen_size.h - 40. },
             Some(Color::GREEN),
         );
         graphics::draw_queued_text(
@@ -286,6 +294,7 @@ impl EventHandler<ggez::GameError> for Game {
                 screen_size.w,
                 screen_size.h,
                 self.airport.position,
+                self.screen_scale,
             )),
             None,
             graphics::FilterMode::Linear,
@@ -293,14 +302,14 @@ impl EventHandler<ggez::GameError> for Game {
 
         for runway in &self.airport.landing_runways {
             let origin = self.airport.origin(runway);
-            let mesh = runway.as_mesh(ctx, origin, Color::RED)?;
+            let mesh = runway.as_mesh(ctx, origin, Color::RED, self.screen_scale)?;
             graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
             let ils = runway
                 .ils(origin)
                 .as_triangle()
                 .iter()
-                .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone()))
+                .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone(), self.screen_scale))
                 .collect::<Vec<Point>>();
             let mesh = graphics::Mesh::new_polygon(
                 ctx,
@@ -312,7 +321,7 @@ impl EventHandler<ggez::GameError> for Game {
         }
 
         for aircraft in aircraft.iter() {
-            let pos = world_to_screen_coords(screen_size.w, screen_size.h, aircraft.position);
+            let pos = world_to_screen_coords(screen_size.w, screen_size.h, aircraft.position, self.screen_scale);
             let aircraft_rect = graphics::Mesh::new_rectangle(
                 ctx,
                 graphics::DrawMode::fill(),

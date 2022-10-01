@@ -393,13 +393,14 @@ impl Runway {
         ctx: &mut Context,
         origin: Point,
         color: Color,
+        screen_scale: f32,
     ) -> GameResult<graphics::Mesh> {
         let screen_size = graphics::screen_coordinates(ctx);
         let line = self
             .as_line(origin)
             // TODO: move elsewhere
             .iter()
-            .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone()))
+            .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone(), screen_scale))
             .collect::<Vec<Point>>();
         // TODO: move screen scale conversion
         graphics::Mesh::new_line(ctx, &line, self.width as f32 * geom::SCREEN_SCALE, color)
