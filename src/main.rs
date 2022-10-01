@@ -33,7 +33,7 @@ const AIRCRAFT_BOUNDING_RADIUS: f32 = AIRCRAFT_RADIUS * 5.0;
 lazy_static! {
     // 34° 43' 5.08" N 32° 29' 6.26" E
     static ref PAPHOS_LATLON: LatLon = LatLon::from_dms(
-        DMS::new(34, 43, 5.08, Cardinal::North), 
+        DMS::new(34, 43, 5.08, Cardinal::North),
         DMS::new(32, 29, 6.26, Cardinal::East)
     );
 }
@@ -46,6 +46,7 @@ struct Game {
     airport: Airport,
     selected_aircraft: Option<usize>,
     aircraft: Arc<RwLock<Vec<Aircraft>>>,
+    screen_pos: Point,
     screen_scale: f32,
 }
 
@@ -60,10 +61,7 @@ impl Game {
         };
         let aircraft = Arc::new(RwLock::new(vec![
             Aircraft {
-                position: ggez::mint::Point2 {
-                    x: 0.0,
-                    y: 0.0,
-                },
+                position: ggez::mint::Point2 { x: 0.0, y: 0.0 },
                 callsign: Callsign {
                     name: "Cyprus Airways".into(),
                     code: "CYP".into(),
@@ -76,7 +74,10 @@ impl Game {
                 cleared_to_land: false,
             },
             Aircraft {
-                position: ggez::mint::Point2 { x: 2000.0, y: 3000.0 },
+                position: ggez::mint::Point2 {
+                    x: 2000.0,
+                    y: 3000.0,
+                },
                 callsign: Callsign {
                     name: "Fedex".into(),
                     code: "FDX".into(),
@@ -118,6 +119,7 @@ impl Game {
                 landing_runways: vec![runway_29.clone()],
             },
             selected_aircraft: None,
+            screen_pos: Point { x: 0.0, y: 0.0 },
             // 1m = 1/25 pixels
             screen_scale: 1. / 25.,
             aircraft,
@@ -221,14 +223,33 @@ impl EventHandler<ggez::GameError> for Game {
         _keymod: event::KeyMods,
         _repeat: bool,
     ) {
-        if keycode == KeyCode::LBracket {
-            self.selected_aircraft =
-                Some((self.selected_aircraft.unwrap_or(0) as i32 - 1).max(0) as usize);
-        } else if keycode == KeyCode::RBracket {
-            self.selected_aircraft = Some(
-                (self.selected_aircraft.unwrap_or(0) + 1)
-                    .min(self.aircraft.read().unwrap().len() - 1),
-            );
+        match keycode {
+            KeyCode::LBracket => {
+                self.selected_aircraft =
+                    Some((self.selected_aircraft.unwrap_or(0) as i32 - 1).max(0) as usize);
+            }
+            KeyCode::RBracket => {
+                self.selected_aircraft = Some(
+                    (self.selected_aircraft.unwrap_or(0) + 1)
+                        .min(self.aircraft.read().unwrap().len() - 1),
+                );
+            }
+            KeyCode::W => {
+                self.screen_pos.y += 10.;
+            }
+            KeyCode::S => {
+                self.screen_pos.y -= 10.;
+            }
+            KeyCode::A => {
+                self.screen_pos.x -= 10.;
+            }
+            KeyCode::D => {
+                self.screen_pos.x += 10.;
+            }
+            KeyCode::F => {
+                self.screen_pos = Point { x: 0., y: 0. };
+            }
+            _ => {}
         }
     }
 
@@ -264,18 +285,34 @@ impl EventHandler<ggez::GameError> for Game {
             Point { x: 0., y: -20.0 },
             Point { x: 0., y: -10.0 },
             // 1km scale
-            Point { x: scale_length, y: -10.0 },
+            Point {
+                x: scale_length,
+                y: -10.0,
+            },
             // uptick right
-            Point { x: scale_length, y: -20.0 },
+            Point {
+                x: scale_length,
+                y: -20.0,
+            },
         ];
         let scale_line = graphics::Mesh::new_line(ctx, &scale_points, 1., Color::GREEN)?;
-        graphics::draw(ctx, &scale_line, (Point { x: 10., y: screen_size.h },))?;
+        graphics::draw(
+            ctx,
+            &scale_line,
+            (Point {
+                x: 10.,
+                y: screen_size.h,
+            },),
+        )?;
 
         let scale_text = graphics::Text::new("1 KM");
         graphics::queue_text(
             ctx,
             &scale_text,
-            Point { x: 10.0, y: screen_size.h - 40. },
+            Point {
+                x: 10.0,
+                y: screen_size.h - 40.,
+            },
             Some(Color::GREEN),
         );
         graphics::draw_queued_text(
@@ -293,6 +330,7 @@ impl EventHandler<ggez::GameError> for Game {
             graphics::DrawParam::new().dest(world_to_screen_coords(
                 screen_size.w,
                 screen_size.h,
+                self.screen_pos,
                 self.airport.position,
                 self.screen_scale,
             )),
@@ -302,14 +340,22 @@ impl EventHandler<ggez::GameError> for Game {
 
         for runway in &self.airport.landing_runways {
             let origin = self.airport.origin(runway);
-            let mesh = runway.as_mesh(ctx, origin, Color::RED, self.screen_scale)?;
+            let mesh = runway.as_mesh(ctx, origin, Color::RED, self.screen_pos, self.screen_scale)?;
             graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
             let ils = runway
                 .ils(origin)
                 .as_triangle()
                 .iter()
-                .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone(), self.screen_scale))
+                .map(|p| {
+                    world_to_screen_coords(
+                        screen_size.w,
+                        screen_size.h,
+                        self.screen_pos,
+                        p.clone(),
+                        self.screen_scale,
+                    )
+                })
                 .collect::<Vec<Point>>();
             let mesh = graphics::Mesh::new_polygon(
                 ctx,
@@ -321,7 +367,13 @@ impl EventHandler<ggez::GameError> for Game {
         }
 
         for aircraft in aircraft.iter() {
-            let pos = world_to_screen_coords(screen_size.w, screen_size.h, aircraft.position, self.screen_scale);
+            let pos = world_to_screen_coords(
+                screen_size.w,
+                screen_size.h,
+                self.screen_pos,
+                aircraft.position,
+                self.screen_scale,
+            );
             let aircraft_rect = graphics::Mesh::new_rectangle(
                 ctx,
                 graphics::DrawMode::fill(),

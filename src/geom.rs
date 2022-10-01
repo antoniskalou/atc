@@ -67,10 +67,19 @@ pub const SCREEN_SCALE: f32 = 1. / 25.;
 /// has Y pointing up and the origin at the center,
 /// to the screen coordinate system, which has Y
 /// pointing downward and the origin at the top-left,
-pub fn world_to_screen_coords(screen_width: f32, screen_height: f32, point: Point, scale: f32) -> Point {
+pub fn world_to_screen_coords(
+    screen_width: f32,
+    screen_height: f32,
+    screen_pos: Point,
+    point: Point,
+    scale: f32,
+) -> Point {
     let x = point.x * scale + screen_width / 2.;
     let y = screen_height - (point.y * scale + screen_height / 2.);
-    Point { x, y }
+    Point {
+        x: x - screen_pos.x,
+        y: y + screen_pos.y,
+    }
 }
 
 #[cfg(test)]

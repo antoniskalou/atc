@@ -1,6 +1,6 @@
 use crate::atc::{AtcReply, AtcRequest};
 use crate::command::AtcCommand;
-use crate::geom::{*, self};
+use crate::geom::{self, *};
 use crate::{math::*, units};
 use ggez::{
     graphics::{self, Color},
@@ -388,11 +388,13 @@ impl Runway {
         is_point_in_circle(aircraft.position, origin, 10.0)
     }
 
+    // FIXME: move me
     pub fn as_mesh(
         &self,
         ctx: &mut Context,
         origin: Point,
         color: Color,
+        screen_pos: Point,
         screen_scale: f32,
     ) -> GameResult<graphics::Mesh> {
         let screen_size = graphics::screen_coordinates(ctx);
@@ -400,7 +402,15 @@ impl Runway {
             .as_line(origin)
             // TODO: move elsewhere
             .iter()
-            .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone(), screen_scale))
+            .map(|p| {
+                world_to_screen_coords(
+                    screen_size.w,
+                    screen_size.h,
+                    screen_pos,
+                    p.clone(),
+                    screen_scale,
+                )
+            })
             .collect::<Vec<Point>>();
         // TODO: move screen scale conversion
         graphics::Mesh::new_line(ctx, &line, self.width as f32 * geom::SCREEN_SCALE, color)

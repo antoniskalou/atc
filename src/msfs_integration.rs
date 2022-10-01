@@ -1,12 +1,9 @@
-use crate::{
-    aircraft::Aircraft,
-    geo::LatLon,
-};
+use crate::{aircraft::Aircraft, geo::LatLon};
 use lazy_static::lazy_static;
 use msfs::sim_connect::{data_definition, InitPosition, SimConnect};
 use std::{
     collections::HashMap,
-    sync::{mpsc, Arc, RwLock,},
+    sync::{mpsc, Arc, RwLock},
 };
 
 const UPDATE_FREQUENCY_MS: u64 = 100;
