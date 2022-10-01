@@ -7,6 +7,7 @@ mod geom;
 mod math;
 mod msfs_integration;
 mod tts;
+mod units;
 
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -52,8 +53,8 @@ impl Game {
         let runway_29 = Runway {
             offset: Point { x: 0.0, y: 0.0 },
             heading: 285,
-            length: 1900,
-            width: 35,
+            length: 2700,
+            width: 45,
             ils_max_altitude: 2000,
         };
         let aircraft = Arc::new(RwLock::new(vec![
@@ -74,7 +75,7 @@ impl Game {
                 cleared_to_land: false,
             },
             Aircraft {
-                position: ggez::mint::Point2 { x: 20.0, y: 30.0 },
+                position: ggez::mint::Point2 { x: 2000.0, y: 3000.0 },
                 callsign: Callsign {
                     name: "Fedex".into(),
                     code: "FDX".into(),
@@ -88,8 +89,8 @@ impl Game {
             },
             Aircraft {
                 position: ggez::mint::Point2 {
-                    x: -200.0,
-                    y: -500.0,
+                    x: -2000.0,
+                    y: -5000.0,
                 },
                 callsign: Callsign {
                     name: "Transavia".into(),
@@ -168,9 +169,7 @@ impl EventHandler<ggez::GameError> for Game {
         let mut aircraft = self.aircraft.write().unwrap();
         for mut aircraft in &mut aircraft.iter_mut() {
             if !aircraft.is_grounded() {
-                // FIXME: use scale in meters
-                let speed_scale = 50.0;
-                let speed_change = (aircraft.speed.current(dt) * dt) / speed_scale;
+                let speed_change = aircraft.speed.current(dt) * units::KT_TO_MS as f32 * dt;
 
                 let heading = aircraft.heading.current(dt);
                 let heading = heading_to_point(heading as i32);
@@ -250,6 +249,35 @@ impl EventHandler<ggez::GameError> for Game {
         let screen_size = graphics::screen_coordinates(ctx);
         let aircraft = self.aircraft.read().unwrap();
 
+        // scale line uses screen coords
+        let scale_length = 1000. * geom::SCREEN_SCALE;
+        let scale_points = [
+            // uptick left
+            Point { x: 0., y: -20.0 },
+            Point { x: 0., y: -10.0 },
+            // 1km scale
+            Point { x: scale_length, y: -10.0 },
+            // uptick right
+            Point { x: scale_length, y: -20.0 },
+        ];
+        let scale_line = graphics::Mesh::new_line(ctx, &scale_points, 1., Color::GREEN)?;
+        graphics::draw(ctx, &scale_line, (Point { x: 10., y: screen_size.h },))?;
+
+        let scale_text = graphics::Text::new("1 KM");
+        graphics::queue_text(
+            ctx,
+            &scale_text,
+            Point { x: 20.0, y: screen_size.h - 30. },
+            Some(Color::GREEN),
+        );
+        graphics::draw_queued_text(
+            ctx,
+            graphics::DrawParam::new(),
+            None,
+            graphics::FilterMode::Linear,
+        )?;
+
+        // airport
         let icao_text = graphics::Text::new(self.airport.icao_code.clone());
         graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
         graphics::draw_queued_text(

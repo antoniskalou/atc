@@ -134,10 +134,9 @@ impl LatLon {
 
     pub fn from_game_world(origin: LatLon, offset: Point) -> Self {
         let bearing = point_to_heading(offset);
+        // 1 world unit = 1m
         let distance = point_distance(Point { x: 0.0, y: 0.0 }, offset);
-        // 1 world unit = 100m
-        let distance = distance as f64 * 100.0;
-        origin.destination(bearing as f64, distance)
+        origin.destination(bearing as f64, distance as f64)
     }
 
     pub fn to_game_world(&self, origin: &LatLon) -> Point {
@@ -179,9 +178,7 @@ impl LatLon {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::math::round_decimal;
-
-    const NM2KM: f64 = 1.852;
+    use crate::{math::round_decimal, units::NM_to_KM};
 
     // Paphos Airport
     const LCPH: LatLon = LatLon {
@@ -235,7 +232,7 @@ mod test {
 
     #[test]
     fn test_latlon_destination() {
-        let distance = (120.0 * NM2KM) * 1000.0;
+        let distance = (120.0 * NM_to_KM) * 1000.0;
         let dest = LCPH.destination(54.0, distance);
         assert_eq!(35.9, round_decimal(dest.latitude(), 1));
         assert_eq!(34.5, round_decimal(dest.longitude(), 1));

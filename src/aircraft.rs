@@ -1,7 +1,7 @@
 use crate::atc::{AtcReply, AtcRequest};
 use crate::command::AtcCommand;
-use crate::geom::*;
-use crate::math::*;
+use crate::geom::{*, self};
+use crate::{math::*, units};
 use ggez::{
     graphics::{self, Color},
     Context, GameResult,
@@ -284,7 +284,8 @@ pub fn aircraft_by_callsign(
     idx.map(|i| (i, &aircraft[i]))
 }
 
-pub const ILS_LENGTH: f32 = 500.0;
+// 8nm
+pub const ILS_LENGTH: f32 = 8. * units::NM_to_KM as f32 * 1000.;
 
 #[derive(Clone, Debug)]
 pub struct ILS {
@@ -337,8 +338,6 @@ impl ILS {
     }
 }
 
-const RUNWAY_DOWNSCALE: f32 = 10.0;
-
 #[derive(Clone, Debug)]
 pub struct Runway {
     /// offset from airport
@@ -360,11 +359,11 @@ impl Runway {
             &[
                 Point {
                     x: origin.x,
-                    y: origin.y - (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
+                    y: origin.y - (self.length as f32 / 2.),
                 },
                 Point {
                     x: origin.x,
-                    y: origin.y + (self.length as f32 / RUNWAY_DOWNSCALE / 2.0),
+                    y: origin.y + (self.length as f32 / 2.),
                 },
             ],
             (self.heading as f32).to_radians(),
@@ -402,7 +401,8 @@ impl Runway {
             .iter()
             .map(|p| world_to_screen_coords(screen_size.w, screen_size.h, p.clone()))
             .collect::<Vec<Point>>();
-        graphics::Mesh::new_line(ctx, &line, self.width as f32 / RUNWAY_DOWNSCALE, color)
+        // TODO: move screen scale conversion
+        graphics::Mesh::new_line(ctx, &line, self.width as f32 * geom::SCREEN_SCALE, color)
     }
 }
 
