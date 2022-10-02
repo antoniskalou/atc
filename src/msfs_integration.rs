@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use msfs::sim_connect::{data_definition, InitPosition, SimConnect};
 use std::{
     collections::HashMap,
-    sync::{mpsc, Arc, RwLock},
+    sync::{mpsc, Arc, RwLock, atomic::{AtomicU32, Ordering}},
 };
 
 const UPDATE_FREQUENCY_MS: u64 = 100;
@@ -26,20 +26,18 @@ pub struct AIPlane {
 type RequestID = msfs::sys::SIMCONNECT_DATA_REQUEST_ID;
 type ObjectID = msfs::sys::SIMCONNECT_OBJECT_ID;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 struct GenRequestID {
-    counter: u32,
+    counter: AtomicU32,
 }
 
 impl GenRequestID {
     fn new() -> Self {
-        Self { counter: 0 }
+        Self { counter: AtomicU32::new(0) }
     }
 
     fn unique(&mut self) -> RequestID {
-        let id = self.counter;
-        self.counter += 1;
-        id
+        self.counter.fetch_add(1, Ordering::SeqCst)
     }
 }
 
