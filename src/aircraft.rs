@@ -1,4 +1,5 @@
 use crate::atc::{AtcReply, AtcRequest};
+use crate::camera::Camera;
 use crate::command::AtcCommand;
 use crate::geom::{self, *};
 use crate::{math::*, units};
@@ -385,7 +386,7 @@ impl Runway {
 
     // TODO
     pub fn has_landed(&self, origin: Point, aircraft: &Aircraft) -> bool {
-        is_point_in_circle(aircraft.position, origin, 10.0)
+        is_point_in_circle(aircraft.position, origin, 500.0)
     }
 
     // FIXME: move me
@@ -394,7 +395,7 @@ impl Runway {
         ctx: &mut Context,
         origin: Point,
         color: Color,
-        screen_pos: Point,
+        camera: &Camera,
         screen_scale: f32,
     ) -> GameResult<graphics::Mesh> {
         let screen_size = graphics::screen_coordinates(ctx);
@@ -403,17 +404,14 @@ impl Runway {
             // TODO: move elsewhere
             .iter()
             .map(|p| {
-                world_to_screen_coords(
-                    screen_size.w,
-                    screen_size.h,
-                    screen_pos,
+                camera.world_to_screen_coords(
                     p.clone(),
                     screen_scale,
                 )
             })
             .collect::<Vec<Point>>();
         // TODO: move screen scale conversion
-        graphics::Mesh::new_line(ctx, &line, self.width as f32 * geom::SCREEN_SCALE, color)
+        graphics::Mesh::new_line(ctx, &line, self.width as f32 * screen_scale, color)
     }
 }
 

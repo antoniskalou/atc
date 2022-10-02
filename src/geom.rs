@@ -59,10 +59,6 @@ pub fn point_to_heading(p: Point) -> i32 {
     }
 }
 
-// 1 meter = 1/25 pixels
-// TODO: make adjustable
-pub const SCREEN_SCALE: f32 = 1. / 25.;
-
 /// Translates the world coordinate system, which
 /// has Y pointing up and the origin at the center,
 /// to the screen coordinate system, which has Y

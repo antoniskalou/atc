@@ -68,7 +68,7 @@ impl MSFS {
                 let request_id = GEN_REQUEST_ID.unique();
                 let init_pos = aircraft_to_init_pos(origin, aircraft.clone());
                 sim.ai_create_non_atc_aircraft(
-                    "PMDG 737-700BDSF FEDEX (G-NXTS - 2021) Fictional", // TODO: fetch model
+                    "Just Flight 146-200QC TNT", // TODO: fetch model
                     &aircraft.callsign.coded(),
                     init_pos,
                     request_id,
@@ -128,5 +128,17 @@ fn aircraft_to_init_pos(origin: LatLon, aircraft: Aircraft) -> InitPosition {
         Longitude: latlon.longitude(),
         OnGround: 0,
         Pitch: 0.0,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_gen_request_id() {
+        let gen = GenRequestID::new();
+        assert_eq!(0, gen.unique());
+        assert_eq!(1, gen.unique());
     }
 }

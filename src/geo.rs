@@ -193,7 +193,7 @@ mod test {
 
     #[test]
     fn test_latlon_from_game_world() {
-        let offset = LatLon::from_game_world(LCPH, Point { x: 0.0, y: 1.0 });
+        let offset = LatLon::from_game_world(LCPH, Point { x: 0.0, y: 100.0 });
         let expected = LCPH.destination(0.0, 100.0);
         assert_eq!(expected.latitude(), offset.latitude());
         assert_eq!(expected.longitude(), offset.longitude());
