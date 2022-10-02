@@ -31,6 +31,7 @@ impl Camera {
 
     /// zoom the camera by a factor, e.g. 0.5 zooms out, 2.0 zooms in
     pub fn zoom(&mut self, scale: f32) {
+        // FIXME: can return 0 if small enough, maybe just use a zoom scalar
         self.view_size.x /= scale;
         self.view_size.y /= scale;
     }
@@ -48,7 +49,6 @@ impl Camera {
             x: view_offset.x * pixels_per_unit.x,
             y: view_offset.y * pixels_per_unit.y,
         };
-
         let x = view_scale.x + self.screen_size.x / 2.0;
         let y = self.screen_size.y - (view_scale.y + self.screen_size.y / 2.0);
         Point { x, y }

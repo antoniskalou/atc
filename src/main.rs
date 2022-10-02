@@ -135,6 +135,19 @@ impl Game {
 
 impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        if input::keyboard::is_key_pressed(ctx, KeyCode::W) {
+            self.camera.move_by(Point { x: 0., y: 100. });
+        }
+        if input::keyboard::is_key_pressed(ctx, KeyCode::S) {
+            self.camera.move_by(Point { x: 0., y: -100. });
+        }
+        if input::keyboard::is_key_pressed(ctx, KeyCode::A) {
+            self.camera.move_by(Point { x: -100., y: 0. });
+        }
+        if input::keyboard::is_key_pressed(ctx, KeyCode::D) {
+            self.camera.move_by(Point { x: 100., y: 0. });
+        }
+
         let dt = timer::delta(ctx).as_secs_f32();
 
         if let Some(msg) = self.cli.try_input() {
