@@ -1,6 +1,6 @@
 use crate::{aircraft::Aircraft, geo::LatLon};
 use lazy_static::lazy_static;
-use msfs::sim_connect::{data_definition, InitPosition, SimConnect};
+use msfs::sim_connect::{data_definition, InitPosition, SimConnect, SimConnectRecv};
 use std::{
     collections::HashMap,
     sync::{mpsc, Arc, RwLock, atomic::{AtomicU32, Ordering}},
@@ -53,7 +53,7 @@ impl MSFS {
         std::thread::spawn(move || {
             let (oid_tx, oid_rx) = mpsc::channel();
             let mut sim = SimConnect::open("ATC", |_sim, recv| match recv {
-                msfs::sim_connect::SimConnectRecv::AssignedObjectId(obj) => {
+                SimConnectRecv::AssignedObjectId(obj) => {
                     let request_id = obj.dwRequestID;
                     let object_id = obj.dwObjectID;
                     println!("Received rid: {}, oid: {}", request_id, object_id);
@@ -63,6 +63,7 @@ impl MSFS {
             })
             .expect("failed to start simconnect");
 
+            // TODO: handle adding new aircraft after init
             let mut aircraft_requests = HashMap::new();
             for aircraft in aircraft.read().unwrap().iter() {
                 let request_id = GEN_REQUEST_ID.unique();

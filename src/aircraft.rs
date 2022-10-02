@@ -396,22 +396,17 @@ impl Runway {
         origin: Point,
         color: Color,
         camera: &Camera,
-        screen_scale: f32,
     ) -> GameResult<graphics::Mesh> {
-        let screen_size = graphics::screen_coordinates(ctx);
         let line = self
             .as_line(origin)
             // TODO: move elsewhere
             .iter()
             .map(|p| {
-                camera.world_to_screen_coords(
-                    p.clone(),
-                    screen_scale,
-                )
+                camera.world_to_screen_coords(p.clone())
             })
             .collect::<Vec<Point>>();
         // TODO: move screen scale conversion
-        graphics::Mesh::new_line(ctx, &line, self.width as f32 * screen_scale, color)
+        graphics::Mesh::new_line(ctx, &line, self.width as f32 * camera.pixels_per_unit().x, color)
     }
 }
 

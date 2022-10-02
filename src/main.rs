@@ -20,6 +20,7 @@ use crate::command::*;
 use crate::geo::*;
 use crate::geom::*;
 use camera::Camera;
+use ggez::input;
 use ggez::{
     event::{self, EventHandler, KeyCode, MouseButton},
     graphics::{self, Color},
@@ -49,7 +50,6 @@ struct Game {
     selected_aircraft: Option<usize>,
     aircraft: Arc<RwLock<Vec<Aircraft>>>,
     camera: Camera,
-    screen_scale: f32,
 }
 
 impl Game {
@@ -124,9 +124,10 @@ impl Game {
             camera: Camera::new(
                 graphics::screen_coordinates(ctx).w,
                 graphics::screen_coordinates(ctx).h,
+                // 80km
+                80_000.,
+                80_000.,
             ),
-            // 1m = 1/25 pixels
-            screen_scale: 1. / 25.,
             aircraft,
         }
     }
@@ -240,16 +241,16 @@ impl EventHandler<ggez::GameError> for Game {
                 );
             }
             KeyCode::W => {
-                self.camera.move_by(Point { x: 0., y: 10. });
+                self.camera.move_by(Point { x: 0., y: 100. });
             }
             KeyCode::S => {
-                self.camera.move_by(Point { x: 0., y: -10. });
+                self.camera.move_by(Point { x: 0., y: -100. });
             }
             KeyCode::A => {
-                self.camera.move_by(Point { x: -10., y: 0. });
+                self.camera.move_by(Point { x: -100., y: 0. });
             }
             KeyCode::D => {
-                self.camera.move_by(Point { x: 10., y: 0. });
+                self.camera.move_by(Point { x: 100., y: 0. });
             }
             KeyCode::F => {
                 self.camera.move_to(Point { x: 0., y: 0. });
@@ -273,8 +274,8 @@ impl EventHandler<ggez::GameError> for Game {
     }
 
     fn mouse_wheel_event(&mut self, _ctx: &mut Context, _x: f32, y: f32) {
-        // scale 1/50 pixels each scroll
-        self.screen_scale = (self.screen_scale + 1. / 50. * y).max(0.02);
+        let zoom_amount = if y > 0.0 { 2. } else { 0.5 };
+        self.camera.zoom(zoom_amount);
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
@@ -283,7 +284,7 @@ impl EventHandler<ggez::GameError> for Game {
         let aircraft = self.aircraft.read().unwrap();
 
         // scale line uses screen coords
-        let scale_length = 1000. * self.screen_scale;
+        let scale_length = 1000. * self.camera.pixels_per_unit().x;
         let scale_points = [
             // uptick left
             Point { x: 0., y: -20.0 },
@@ -305,7 +306,7 @@ impl EventHandler<ggez::GameError> for Game {
             &scale_line,
             (Point {
                 x: 10.,
-                y: self.camera.screen_size().x,
+                y: self.camera.screen_size().y,
             },),
         )?;
 
@@ -331,17 +332,14 @@ impl EventHandler<ggez::GameError> for Game {
         graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
         graphics::draw_queued_text(
             ctx,
-            graphics::DrawParam::new().dest(self.camera.world_to_screen_coords(
-                self.airport.position,
-                self.screen_scale,
-            )),
+            graphics::DrawParam::new().dest(self.camera.world_to_screen_coords(self.airport.position)),
             None,
             graphics::FilterMode::Linear,
         )?;
 
         for runway in &self.airport.landing_runways {
             let origin = self.airport.origin(runway);
-            let mesh = runway.as_mesh(ctx, origin, Color::RED, &self.camera, self.screen_scale)?;
+            let mesh = runway.as_mesh(ctx, origin, Color::RED, &self.camera)?;
             graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
 
             let ils = runway
@@ -349,10 +347,7 @@ impl EventHandler<ggez::GameError> for Game {
                 .as_triangle()
                 .iter()
                 .map(|p| {
-                    self.camera.world_to_screen_coords(
-                        p.clone(),
-                        self.screen_scale,
-                    )
+                    self.camera.world_to_screen_coords(p.clone())
                 })
                 .collect::<Vec<Point>>();
             let mesh = graphics::Mesh::new_polygon(
@@ -365,10 +360,7 @@ impl EventHandler<ggez::GameError> for Game {
         }
 
         for aircraft in aircraft.iter() {
-            let pos = self.camera.world_to_screen_coords(
-                aircraft.position,
-                self.screen_scale,
-            );
+            let pos = self.camera.world_to_screen_coords(aircraft.position);
             let aircraft_rect = graphics::Mesh::new_rectangle(
                 ctx,
                 graphics::DrawMode::fill(),
