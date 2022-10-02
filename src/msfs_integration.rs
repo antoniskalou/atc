@@ -36,7 +36,7 @@ impl GenRequestID {
         Self { counter: AtomicU32::new(0) }
     }
 
-    fn unique(&mut self) -> RequestID {
+    fn unique(&self) -> RequestID {
         self.counter.fetch_add(1, Ordering::SeqCst)
     }
 }
@@ -51,7 +51,6 @@ pub struct MSFS;
 impl MSFS {
     pub fn new(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) -> Self {
         std::thread::spawn(move || {
-            let mut gen_request_id = GenRequestID::new();
             let (oid_tx, oid_rx) = mpsc::channel();
             let mut sim = SimConnect::open("ATC", |_sim, recv| match recv {
                 msfs::sim_connect::SimConnectRecv::AssignedObjectId(obj) => {
@@ -66,7 +65,7 @@ impl MSFS {
 
             let mut aircraft_requests = HashMap::new();
             for aircraft in aircraft.read().unwrap().iter() {
-                let request_id = gen_request_id.unique();
+                let request_id = GEN_REQUEST_ID.unique();
                 let init_pos = aircraft_to_init_pos(origin, aircraft.clone());
                 sim.ai_create_non_atc_aircraft(
                     "PMDG 737-700BDSF FEDEX (G-NXTS - 2021) Fictional", // TODO: fetch model
@@ -84,7 +83,7 @@ impl MSFS {
 
                 if let Ok((rid, oid)) = oid_rx.try_recv() {
                     if let Some(aircraft) = aircraft_requests.get(&rid) {
-                        sim.ai_release_control(oid, gen_request_id.unique())
+                        sim.ai_release_control(oid, GEN_REQUEST_ID.unique())
                             .unwrap();
                         aircraft_objects.insert(oid, aircraft);
                     }
@@ -105,7 +104,7 @@ impl MSFS {
                         // aircraft has been removed
                         // FIXME: check not removing other processes objects
                         None => {
-                            sim.ai_remove_object(*oid, gen_request_id.unique()).unwrap();
+                            sim.ai_remove_object(*oid, GEN_REQUEST_ID.unique()).unwrap();
                         }
                     }
                 }
