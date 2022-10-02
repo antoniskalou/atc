@@ -1,10 +1,13 @@
 use crate::geom::Point;
 
+const MIN_ZOOM: f32 = 0.00001;
+
 #[derive(Clone, Debug)]
 pub struct Camera {
     screen_size: Point,
     view_center: Point,
     view_size: Point,
+    zoom: f32,
 }
 
 impl Camera {
@@ -13,6 +16,7 @@ impl Camera {
             screen_size: Point { x: screen_width, y: screen_height },
             view_size: Point { x: view_width, y: view_height },
             view_center: Point { x: 0., y: 0. },
+            zoom: 1.,
         }
     }
 
@@ -32,8 +36,7 @@ impl Camera {
     /// zoom the camera by a factor, e.g. 0.5 zooms out, 2.0 zooms in
     pub fn zoom(&mut self, scale: f32) {
         // FIXME: can return 0 if small enough, maybe just use a zoom scalar
-        self.view_size.x /= scale;
-        self.view_size.y /= scale;
+        self.zoom = (self.zoom * scale).max(MIN_ZOOM);
     }
 
     pub fn world_to_screen_coords(
@@ -56,8 +59,8 @@ impl Camera {
 
     pub fn pixels_per_unit(&self) -> Point {
         Point { 
-            x: self.screen_size.x / self.view_size.x,
-            y: self.screen_size.y / self.view_size.y,
+            x: self.screen_size.x / self.view_size.x * self.zoom,
+            y: self.screen_size.y / self.view_size.y * self.zoom,
         }
     }
 }

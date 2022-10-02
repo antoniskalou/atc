@@ -116,6 +116,10 @@ impl MSFS {
 
         Self
     }
+
+    pub fn update_state(&self, aircraft: Arc<Vec<Aircraft>>) {
+
+    }
 }
 
 fn aircraft_to_init_pos(origin: LatLon, aircraft: Aircraft) -> InitPosition {
