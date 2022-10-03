@@ -11,7 +11,7 @@ use std::{
         atomic::{AtomicU32, Ordering},
         mpsc::{self, Sender},
         Arc, RwLock,
-    },
+    }, cell::RefCell, rc::Rc
 };
 
 const UPDATE_FREQUENCY_MS: u64 = 100;
@@ -78,31 +78,29 @@ impl MSFS {
             })
             .expect("failed to start simconnect");
 
-            // TODO: handle adding new aircraft after init
-            let mut aircraft_requests = HashMap::new();
-            let mut aircraft_objects = HashMap::new();
-
-            create_aircraft(
-                &mut sim,
-                &mut aircraft_requests,
-                origin,
-                aircraft.read().unwrap().iter(),
-            );
-
+            let mut requests: HashMap<u32, Callsign> = HashMap::new();
+            let mut objects = HashMap::new();
             loop {
                 sim.call_dispatch().expect("call dispatch");
 
+                create_aircraft(
+                    &mut sim,
+                    &mut requests,
+                    origin,
+                    aircraft.read().unwrap().iter(),
+                );
+
                 if let Ok((rid, oid)) = oid_rx.try_recv() {
-                    if let Some(aircraft) = aircraft_requests.get(&rid) {
+                    if let Some(aircraft) = requests.get(&rid) {
                         sim.ai_release_control(oid, GEN_REQUEST_ID.unique())
                             .unwrap();
-                        aircraft_objects.insert(oid, aircraft);
+                        objects.insert(oid, aircraft.clone());
                     }
                 }
 
                 update_aircraft(
                     &mut sim,
-                    &mut aircraft_objects,
+                    &mut objects,
                     &mut aircraft.read().unwrap().iter(),
                 );
 
@@ -142,11 +140,11 @@ fn create_aircraft(
 
 fn update_aircraft(
     sim: &mut Pin<Box<SimConnect>>,
-    objects: &mut HashMap<ObjectID, &Callsign>,
+    objects: &mut HashMap<ObjectID, Callsign>,
     aircraft: &mut std::slice::Iter<'_, Aircraft>,
 ) {
     for (oid, callsign) in objects {
-        match aircraft.find(|a| a.callsign == **callsign) {
+        match aircraft.find(|a| a.callsign == *callsign) {
             Some(simaircraft) => {
                 let simdata = AIPlane {
                     altitude: simaircraft.altitude.current as f64,
