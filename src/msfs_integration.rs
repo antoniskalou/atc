@@ -11,7 +11,7 @@ use std::{
         atomic::{AtomicU32, Ordering},
         mpsc::{self, Sender},
         Arc, RwLock,
-    }, cell::RefCell, rc::Rc
+    }, cell::RefCell, rc::Rc, thread::JoinHandle
 };
 
 const UPDATE_FREQUENCY_MS: u64 = 100;
@@ -55,59 +55,49 @@ lazy_static! {
     static ref GEN_REQUEST_ID: GenRequestID = GenRequestID::new();
 }
 
-#[derive(Debug)]
-pub struct MSFS {
-    #[allow(dead_code)]
-    thread: std::thread::JoinHandle<()>,
-}
-
-impl MSFS {
-    pub fn new(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) -> Self {
-        let thread = std::thread::spawn(move || {
-            let (oid_tx, oid_rx) = mpsc::channel();
-            let mut sim = SimConnect::open("ATC", |_sim, recv| match recv {
-                SimConnectRecv::AssignedObjectId(obj) => {
-                    let request_id = obj.dwRequestID;
-                    let object_id = obj.dwObjectID;
-                    println!("Received rid: {}, oid: {}", request_id, object_id);
-                    oid_tx.send((request_id, object_id)).unwrap();
-                }
-                _ => println!("SimConnect: {:?}", recv),
-            })
-            .expect("failed to start simconnect");
-
-            let mut requests: HashMap<u32, Callsign> = HashMap::new();
-            let mut objects = HashMap::new();
-            loop {
-                sim.call_dispatch().expect("call dispatch");
-
-                create_aircraft(
-                    &mut sim,
-                    &mut requests,
-                    origin,
-                    aircraft.read().unwrap().iter(),
-                );
-
-                if let Ok((rid, oid)) = oid_rx.try_recv() {
-                    if let Some(aircraft) = requests.get(&rid) {
-                        sim.ai_release_control(oid, GEN_REQUEST_ID.unique())
-                            .unwrap();
-                        objects.insert(oid, aircraft.clone());
-                    }
-                }
-
-                update_aircraft(
-                    &mut sim,
-                    &mut objects,
-                    &mut aircraft.read().unwrap().iter(),
-                );
-
-                std::thread::sleep(std::time::Duration::from_millis(UPDATE_FREQUENCY_MS));
+pub fn start_msfs_monitor(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) -> JoinHandle<()> {
+    std::thread::spawn(move || {
+        let (oid_tx, oid_rx) = mpsc::channel();
+        let mut sim = SimConnect::open("ATC", |_sim, recv| match recv {
+            SimConnectRecv::AssignedObjectId(obj) => {
+                let request_id = obj.dwRequestID;
+                let object_id = obj.dwObjectID;
+                println!("Received rid: {}, oid: {}", request_id, object_id);
+                oid_tx.send((request_id, object_id)).unwrap();
             }
-        });
+            _ => println!("SimConnect: {:?}", recv),
+        })
+        .expect("failed to start simconnect");
 
-        Self { thread, }
-    }
+        let mut requests: HashMap<u32, Callsign> = HashMap::new();
+        let mut objects = HashMap::new();
+        loop {
+            sim.call_dispatch().expect("call dispatch");
+
+            create_aircraft(
+                &mut sim,
+                &mut requests,
+                origin,
+                aircraft.read().unwrap().iter(),
+            );
+
+            if let Ok((rid, oid)) = oid_rx.try_recv() {
+                if let Some(aircraft) = requests.get(&rid) {
+                    sim.ai_release_control(oid, GEN_REQUEST_ID.unique())
+                        .unwrap();
+                    objects.insert(oid, aircraft.clone());
+                }
+            }
+
+            update_aircraft(
+                &mut sim,
+                &mut objects,
+                &mut aircraft.read().unwrap().iter(),
+            );
+
+            std::thread::sleep(std::time::Duration::from_millis(UPDATE_FREQUENCY_MS));
+        }
+    })
 }
 
 fn create_aircraft(

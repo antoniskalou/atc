@@ -27,6 +27,7 @@ use ggez::{
     timer, Context, ContextBuilder, GameResult,
 };
 use lazy_static::lazy_static;
+use msfs_integration::start_msfs_monitor;
 
 const TTS_ENABLED: bool = false;
 
@@ -45,7 +46,6 @@ lazy_static! {
 struct Game {
     atc: Atc,
     cli: CliPrompt,
-    msfs: msfs_integration::MSFS,
     airport: Airport,
     selected_aircraft: Option<usize>,
     aircraft: Arc<RwLock<Vec<Aircraft>>>,
@@ -109,11 +109,11 @@ impl Game {
             },
         ]));
 
+        let _msfs_thread = start_msfs_monitor(*PAPHOS_LATLON, aircraft.clone());
+
         Self {
             atc: Atc::new(TTS_ENABLED),
             cli: CliPrompt::new(String::from("ATC>")),
-            msfs: msfs_integration::MSFS::new(*PAPHOS_LATLON, aircraft.clone()),
-            // msfs: msfs_integration::MSFS,
             airport: Airport {
                 position: Point { x: 0.0, y: 0.0 },
                 icao_code: "LCPH".into(),
