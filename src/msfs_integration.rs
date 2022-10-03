@@ -1,9 +1,17 @@
-use crate::{aircraft::Aircraft, geo::LatLon};
+use crate::{
+    aircraft::{Aircraft, Callsign},
+    geo::LatLon,
+};
 use lazy_static::lazy_static;
 use msfs::sim_connect::{data_definition, InitPosition, SimConnect, SimConnectRecv};
 use std::{
     collections::HashMap,
-    sync::{mpsc, Arc, RwLock, atomic::{AtomicU32, Ordering}},
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        mpsc::{self, Sender},
+        Arc, RwLock,
+    },
 };
 
 const UPDATE_FREQUENCY_MS: u64 = 100;
@@ -33,7 +41,9 @@ struct GenRequestID {
 
 impl GenRequestID {
     fn new() -> Self {
-        Self { counter: AtomicU32::new(0) }
+        Self {
+            counter: AtomicU32::new(0),
+        }
     }
 
     fn unique(&self) -> RequestID {
@@ -46,11 +56,16 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub struct MSFS;
+pub struct MSFS {
+    #[allow(dead_code)]
+    thread: std::thread::JoinHandle<()>,
+    state_tx: Sender<Arc<Vec<Aircraft>>>,
+}
 
 impl MSFS {
     pub fn new(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) -> Self {
-        std::thread::spawn(move || {
+        let (state_tx, state_rx) = mpsc::channel();
+        let thread = std::thread::spawn(move || {
             let (oid_tx, oid_rx) = mpsc::channel();
             let mut sim = SimConnect::open("ATC", |_sim, recv| match recv {
                 SimConnectRecv::AssignedObjectId(obj) => {
@@ -65,20 +80,15 @@ impl MSFS {
 
             // TODO: handle adding new aircraft after init
             let mut aircraft_requests = HashMap::new();
-            for aircraft in aircraft.read().unwrap().iter() {
-                let request_id = GEN_REQUEST_ID.unique();
-                let init_pos = aircraft_to_init_pos(origin, aircraft.clone());
-                sim.ai_create_non_atc_aircraft(
-                    "Just Flight 146-200QC TNT", // TODO: fetch model
-                    &aircraft.callsign.coded(),
-                    init_pos,
-                    request_id,
-                )
-                .unwrap();
-                aircraft_requests.insert(request_id, aircraft.callsign.clone());
-            }
-
             let mut aircraft_objects = HashMap::new();
+
+            create_aircraft(
+                &mut sim,
+                &mut aircraft_requests,
+                origin,
+                aircraft.read().unwrap().iter(),
+            );
+
             loop {
                 sim.call_dispatch().expect("call dispatch");
 
@@ -90,35 +100,67 @@ impl MSFS {
                     }
                 }
 
-                for (oid, callsign) in &aircraft_objects {
-                    let aircraft = aircraft.read().unwrap();
-
-                    match aircraft.iter().find(|a| a.callsign == **callsign) {
-                        Some(simaircraft) => {
-                            let simdata = AIPlane {
-                                altitude: simaircraft.altitude.current as f64,
-                                heading: simaircraft.heading.current.to_radians() as f64,
-                                airspeed: simaircraft.speed.current as f64,
-                            };
-                            sim.set_data_on_sim_object(*oid, &simdata).unwrap();
-                        }
-                        // aircraft has been removed
-                        // FIXME: check not removing other processes objects
-                        None => {
-                            sim.ai_remove_object(*oid, GEN_REQUEST_ID.unique()).unwrap();
-                        }
-                    }
-                }
+                update_aircraft(
+                    &mut sim,
+                    &mut aircraft_objects,
+                    &mut aircraft.read().unwrap().iter(),
+                );
 
                 std::thread::sleep(std::time::Duration::from_millis(UPDATE_FREQUENCY_MS));
             }
         });
 
-        Self
+        Self { thread, state_tx }
     }
 
     pub fn update_state(&self, aircraft: Arc<Vec<Aircraft>>) {
+        self.state_tx.send(aircraft).unwrap()
+    }
+}
 
+fn create_aircraft(
+    sim: &mut Pin<Box<SimConnect>>,
+    requests: &mut HashMap<RequestID, Callsign>,
+    origin: LatLon,
+    aircraft: std::slice::Iter<'_, Aircraft>,
+) {
+    for aircraft in aircraft {
+        if !requests.values().any(|a| *a == aircraft.callsign) {
+            let request_id = GEN_REQUEST_ID.unique();
+            let init_pos = aircraft_to_init_pos(origin, aircraft.clone());
+            sim.ai_create_non_atc_aircraft(
+                "Just Flight 146-200QC TNT", // TODO: fetch model
+                &aircraft.callsign.coded(),
+                init_pos,
+                request_id,
+            )
+            .unwrap();
+            requests.insert(request_id, aircraft.callsign.clone());
+        }
+    }
+}
+
+fn update_aircraft(
+    sim: &mut Pin<Box<SimConnect>>,
+    objects: &mut HashMap<ObjectID, &Callsign>,
+    aircraft: &mut std::slice::Iter<'_, Aircraft>,
+) {
+    for (oid, callsign) in objects {
+        match aircraft.find(|a| a.callsign == **callsign) {
+            Some(simaircraft) => {
+                let simdata = AIPlane {
+                    altitude: simaircraft.altitude.current as f64,
+                    heading: simaircraft.heading.current.to_radians() as f64,
+                    airspeed: simaircraft.speed.current as f64,
+                };
+                sim.set_data_on_sim_object(*oid, &simdata).unwrap();
+            }
+            // aircraft has been removed
+            // FIXME: check not removing other processes objects
+            None => {
+                sim.ai_remove_object(*oid, GEN_REQUEST_ID.unique()).unwrap();
+            }
+        }
     }
 }
 

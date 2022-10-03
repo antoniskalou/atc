@@ -13,8 +13,14 @@ pub struct Camera {
 impl Camera {
     pub fn new(screen_width: f32, screen_height: f32, view_width: f32, view_height: f32) -> Self {
         Self {
-            screen_size: Point { x: screen_width, y: screen_height },
-            view_size: Point { x: view_width, y: view_height },
+            screen_size: Point {
+                x: screen_width,
+                y: screen_height,
+            },
+            view_size: Point {
+                x: view_width,
+                y: view_height,
+            },
             view_center: Point { x: 0., y: 0. },
             zoom: 1.,
         }
@@ -39,10 +45,7 @@ impl Camera {
         self.zoom = (self.zoom * scale).max(MIN_ZOOM);
     }
 
-    pub fn world_to_screen_coords(
-        &self,
-        point: Point,
-    ) -> Point {
+    pub fn world_to_screen_coords(&self, point: Point) -> Point {
         let pixels_per_unit = self.pixels_per_unit();
         let view_offset = Point {
             x: point.x - self.view_center.x,
@@ -58,7 +61,7 @@ impl Camera {
     }
 
     pub fn pixels_per_unit(&self) -> Point {
-        Point { 
+        Point {
             x: self.screen_size.x / self.view_size.x * self.zoom,
             y: self.screen_size.y / self.view_size.y * self.zoom,
         }

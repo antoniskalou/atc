@@ -345,7 +345,8 @@ impl EventHandler<ggez::GameError> for Game {
         graphics::queue_text(ctx, &icao_text, Point { x: 0.0, y: 0.0 }, Some(Color::BLUE));
         graphics::draw_queued_text(
             ctx,
-            graphics::DrawParam::new().dest(self.camera.world_to_screen_coords(self.airport.position)),
+            graphics::DrawParam::new()
+                .dest(self.camera.world_to_screen_coords(self.airport.position)),
             None,
             graphics::FilterMode::Linear,
         )?;
@@ -359,9 +360,7 @@ impl EventHandler<ggez::GameError> for Game {
                 .ils(origin)
                 .as_triangle()
                 .iter()
-                .map(|p| {
-                    self.camera.world_to_screen_coords(p.clone())
-                })
+                .map(|p| self.camera.world_to_screen_coords(p.clone()))
                 .collect::<Vec<Point>>();
             let mesh = graphics::Mesh::new_polygon(
                 ctx,

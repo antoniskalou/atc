@@ -59,25 +59,6 @@ pub fn point_to_heading(p: Point) -> i32 {
     }
 }
 
-/// Translates the world coordinate system, which
-/// has Y pointing up and the origin at the center,
-/// to the screen coordinate system, which has Y
-/// pointing downward and the origin at the top-left,
-pub fn world_to_screen_coords(
-    screen_width: f32,
-    screen_height: f32,
-    screen_pos: Point,
-    point: Point,
-    scale: f32,
-) -> Point {
-    let x = point.x * scale + screen_width / 2.;
-    let y = screen_height - (point.y * scale + screen_height / 2.);
-    Point {
-        x: x - screen_pos.x,
-        y: y + screen_pos.y,
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

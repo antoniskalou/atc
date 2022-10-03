@@ -1,7 +1,7 @@
 use crate::atc::{AtcReply, AtcRequest};
 use crate::camera::Camera;
 use crate::command::AtcCommand;
-use crate::geom::{self, *};
+use crate::geom::*;
 use crate::{math::*, units};
 use ggez::{
     graphics::{self, Color},
@@ -401,12 +401,15 @@ impl Runway {
             .as_line(origin)
             // TODO: move elsewhere
             .iter()
-            .map(|p| {
-                camera.world_to_screen_coords(p.clone())
-            })
+            .map(|p| camera.world_to_screen_coords(p.clone()))
             .collect::<Vec<Point>>();
         // TODO: move screen scale conversion
-        graphics::Mesh::new_line(ctx, &line, self.width as f32 * camera.pixels_per_unit().x, color)
+        graphics::Mesh::new_line(
+            ctx,
+            &line,
+            self.width as f32 * camera.pixels_per_unit().x,
+            color,
+        )
     }
 }
 

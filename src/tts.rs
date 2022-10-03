@@ -5,7 +5,7 @@ use std::thread;
 
 #[derive(Debug)]
 pub struct TextToSpeech {
-    thread: thread::JoinHandle<()>,
+    #[allow(dead_code)] thread: thread::JoinHandle<()>,
     queue: Sender<String>,
 }
 
