@@ -59,12 +59,10 @@ lazy_static! {
 pub struct MSFS {
     #[allow(dead_code)]
     thread: std::thread::JoinHandle<()>,
-    state_tx: Sender<Arc<Vec<Aircraft>>>,
 }
 
 impl MSFS {
     pub fn new(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) -> Self {
-        let (state_tx, state_rx) = mpsc::channel();
         let thread = std::thread::spawn(move || {
             let (oid_tx, oid_rx) = mpsc::channel();
             let mut sim = SimConnect::open("ATC", |_sim, recv| match recv {
@@ -108,11 +106,7 @@ impl MSFS {
             }
         });
 
-        Self { thread, state_tx }
-    }
-
-    pub fn update_state(&self, aircraft: Arc<Vec<Aircraft>>) {
-        self.state_tx.send(aircraft).unwrap()
+        Self { thread, }
     }
 }
 
