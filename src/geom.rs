@@ -1,3 +1,5 @@
+use crate::math::clamp;
+
 pub type Point = ggez::mint::Point2<f32>;
 
 pub fn point_distance(p1: Point, p2: Point) -> f32 {
@@ -56,6 +58,30 @@ pub fn point_to_heading(p: Point) -> i32 {
         360 + diff
     } else {
         diff
+    }
+}
+
+pub fn dot_product(p1: Point, p2: Point) -> f32 {
+    p1.x * p2.x + p1.y * p2.y
+}
+
+/// https://stackoverflow.com/a/1501725
+pub fn distance_line_and_point(line: &[Point; 2], p: Point) -> f32 {
+    let [v, w] = *line;
+    let length = point_distance(v, w);
+
+    if length == 0. {
+        length
+    } else {
+        let t = clamp(dot_product(
+            Point { x: p.x - v.x, y: p.y - v.y },
+            Point { x: w.x - v.x, y: w.y - v.y },
+        ) / length, 0., 1.);
+        let projection = Point {
+            x: v.x + t * (w.x - v.x),
+            y: v.y + t * (w.y - v.y),
+        };
+        point_distance(p, projection)
     }
 }
 

@@ -9,9 +9,9 @@ use std::{
     pin::Pin,
     sync::{
         atomic::{AtomicU32, Ordering},
-        mpsc::{self, Sender},
-        Arc, RwLock,
-    }, cell::RefCell, rc::Rc, thread::JoinHandle
+        mpsc, Arc, RwLock,
+    },
+    thread::JoinHandle,
 };
 
 const UPDATE_FREQUENCY_MS: u64 = 100;
@@ -89,11 +89,7 @@ pub fn start_msfs_monitor(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) 
                 }
             }
 
-            update_aircraft(
-                &mut sim,
-                &mut objects,
-                &mut aircraft.read().unwrap().iter(),
-            );
+            update_aircraft(&mut sim, &mut objects, &mut aircraft.read().unwrap().iter());
 
             std::thread::sleep(std::time::Duration::from_millis(UPDATE_FREQUENCY_MS));
         }
