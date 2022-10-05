@@ -132,10 +132,10 @@ impl LatLon {
         )
     }
 
-    pub fn from_game_world(origin: LatLon, offset: Point) -> Self {
+    pub fn from_game_world(origin: LatLon, offset: glm::Vec2) -> Self {
         let bearing = point_to_heading(offset);
         // 1 world unit = 1m
-        let distance = point_distance(Point { x: 0.0, y: 0.0 }, offset);
+        let distance = point_distance(glm::zero(), offset);
         origin.destination(bearing as f64, distance as f64)
     }
 
@@ -193,12 +193,12 @@ mod test {
 
     #[test]
     fn test_latlon_from_game_world() {
-        let offset = LatLon::from_game_world(LCPH, Point { x: 0.0, y: 100.0 });
+        let offset = LatLon::from_game_world(LCPH, glm::vec2(0.0, 100.0));
         let expected = LCPH.destination(0.0, 100.0);
         assert_eq!(expected.latitude(), offset.latitude());
         assert_eq!(expected.longitude(), offset.longitude());
 
-        let offset = LatLon::from_game_world(LCPH, Point { x: 100.0, y: 0.0 });
+        let offset = LatLon::from_game_world(LCPH, glm::vec2(100.0, 0.0));
         let expected = LCPH.destination(90.0, 100.0);
         assert_eq!(expected.latitude().round(), offset.latitude().round());
         assert_eq!(expected.longitude().round(), offset.longitude().round());

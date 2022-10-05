@@ -1,3 +1,5 @@
+extern crate nalgebra_glm as glm;
+
 mod aircraft;
 mod atc;
 mod camera;
@@ -55,7 +57,7 @@ struct Game {
 impl Game {
     pub fn new(ctx: &mut Context) -> Self {
         let runway_29 = Runway {
-            offset: Point { x: 0.0, y: 0.0 },
+            offset: glm::zero(),
             heading: 285,
             length: 2700,
             width: 45,
@@ -63,7 +65,7 @@ impl Game {
         };
         let aircraft = Arc::new(RwLock::new(vec![
             Aircraft {
-                position: ggez::mint::Point2 { x: 0.0, y: 0.0 },
+                position: glm::vec2(0.0, 0.0),
                 callsign: Callsign {
                     name: "Cyprus Airways".into(),
                     code: "CYP".into(),
@@ -76,10 +78,7 @@ impl Game {
                 cleared_to_land: false,
             },
             Aircraft {
-                position: ggez::mint::Point2 {
-                    x: 2000.0,
-                    y: 3000.0,
-                },
+                position: glm::vec2(2000.0, 3000.0),
                 callsign: Callsign {
                     name: "Fedex".into(),
                     code: "FDX".into(),
@@ -92,10 +91,7 @@ impl Game {
                 cleared_to_land: false,
             },
             Aircraft {
-                position: ggez::mint::Point2 {
-                    x: -2000.0,
-                    y: -5000.0,
-                },
+                position: glm::vec2(-2000.0, -5000.0),
                 callsign: Callsign {
                     name: "Transavia".into(),
                     code: "TRA".into(),
@@ -115,7 +111,7 @@ impl Game {
             atc: Atc::new(TTS_ENABLED),
             cli: CliPrompt::new(String::from("ATC>")),
             airport: Airport {
-                position: Point { x: 0.0, y: 0.0 },
+                position: glm::vec2(0.0, 0.0),
                 icao_code: "LCPH".into(),
                 takeoff_runways: vec![runway_29.clone()],
                 landing_runways: vec![runway_29.clone()],
@@ -136,16 +132,16 @@ impl Game {
 impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         if input::keyboard::is_key_pressed(ctx, KeyCode::W) {
-            self.camera.move_by(Point { x: 0., y: 100. });
+            self.camera.move_by(glm::vec2(0., 100.));
         }
         if input::keyboard::is_key_pressed(ctx, KeyCode::S) {
-            self.camera.move_by(Point { x: 0., y: -100. });
+            self.camera.move_by(glm::vec2(0., -100.));
         }
         if input::keyboard::is_key_pressed(ctx, KeyCode::A) {
-            self.camera.move_by(Point { x: -100., y: 0. });
+            self.camera.move_by(glm::vec2(-100., 0.));
         }
         if input::keyboard::is_key_pressed(ctx, KeyCode::D) {
-            self.camera.move_by(Point { x: 100., y: 0. });
+            self.camera.move_by(glm::vec2(100., 0.));
         }
 
         let dt = timer::delta(ctx).as_secs_f32();
@@ -253,21 +249,6 @@ impl EventHandler<ggez::GameError> for Game {
                         .min(self.aircraft.read().unwrap().len() - 1),
                 );
             }
-            KeyCode::W => {
-                self.camera.move_by(Point { x: 0., y: 100. });
-            }
-            KeyCode::S => {
-                self.camera.move_by(Point { x: 0., y: -100. });
-            }
-            KeyCode::A => {
-                self.camera.move_by(Point { x: -100., y: 0. });
-            }
-            KeyCode::D => {
-                self.camera.move_by(Point { x: 100., y: 0. });
-            }
-            KeyCode::F => {
-                self.camera.move_to(Point { x: 0., y: 0. });
-            }
             _ => {}
         }
     }
@@ -278,7 +259,7 @@ impl EventHandler<ggez::GameError> for Game {
             let click_pos = Point { x, y };
 
             for (i, aircraft) in self.aircraft.read().unwrap().iter().enumerate() {
-                if is_point_in_circle(click_pos, aircraft.position, AIRCRAFT_BOUNDING_RADIUS) {
+                if is_point_in_circle(MintPoint::from(click_pos).into(), aircraft.position, AIRCRAFT_BOUNDING_RADIUS) {
                     self.selected_aircraft = Some(i);
                     break;
                 }

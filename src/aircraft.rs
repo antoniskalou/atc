@@ -197,7 +197,7 @@ impl AircraftParameter {
 
 #[derive(Clone, Debug)]
 pub struct Aircraft {
-    pub position: Point,
+    pub position: glm::Vec2,
     pub callsign: Callsign,
     /// bearing
     // FIXME: need to call current to continue, its opaque to caller
@@ -291,29 +291,23 @@ pub const ILS_LENGTH: f32 = 8. * units::NM_to_KM as f32 * 1000.;
 #[derive(Clone, Debug)]
 pub struct ILS {
     // position at end of the runway
-    origin: Point,
+    origin: glm::Vec2,
     runway: Runway,
 }
 
 impl ILS {
-    pub fn as_triangle(&self) -> Vec<Point> {
+    pub fn as_triangle(&self) -> Vec<glm::Vec2> {
         let localizer = [
             self.origin,
             // 3 degree variance
             rotate_point(
                 self.origin,
-                Point {
-                    x: self.origin.x,
-                    y: self.origin.y + ILS_LENGTH,
-                },
+                glm::vec2(self.origin.x, self.origin.y + ILS_LENGTH),
                 3f32.to_radians(),
             ),
             rotate_point(
                 self.origin,
-                Point {
-                    x: self.origin.x,
-                    y: self.origin.y + ILS_LENGTH,
-                },
+                glm::vec2(self.origin.x, self.origin.y + ILS_LENGTH),
                 -3f32.to_radians(),
             ),
         ];
@@ -326,11 +320,11 @@ impl ILS {
         )
     }
 
-    pub fn distance(&self, position: Point) -> f32 {
+    pub fn distance(&self, position: glm::Vec2) -> f32 {
         point_distance(position, self.origin)
     }
 
-    pub fn altitude(&self, position: Point) -> u32 {
+    pub fn altitude(&self, position: glm::Vec2) -> u32 {
         let distance = self.distance(position);
         let expected_alt = self.runway.ils_max_altitude as f32 * (distance / ILS_LENGTH);
         // round to 1000
@@ -342,7 +336,7 @@ impl ILS {
 #[derive(Clone, Debug)]
 pub struct Runway {
     /// offset from airport
-    pub offset: Point,
+    pub offset: glm::Vec2,
     /// bearing
     pub heading: u32,
     /// length in meters
@@ -354,29 +348,23 @@ pub struct Runway {
 }
 
 impl Runway {
-    pub fn as_line(&self, origin: Point) -> Vec<Point> {
+    pub fn as_line(&self, origin: glm::Vec2) -> Vec<glm::Vec2> {
         rotate_points(
             origin,
             &[
-                Point {
-                    x: origin.x,
-                    y: origin.y - (self.length as f32 / 2.),
-                },
-                Point {
-                    x: origin.x,
-                    y: origin.y + (self.length as f32 / 2.),
-                },
+                glm::vec2(origin.x, origin.y - (self.length as f32 / 2.)),
+                glm::vec2(origin.x, origin.y + (self.length as f32 / 2.)),
             ],
             (self.heading as f32).to_radians(),
         )
     }
 
-    pub fn ils(&self, origin: Point) -> ILS {
-        let origin = Point {
+    pub fn ils(&self, origin: glm::Vec2) -> ILS {
+        let origin = glm::vec2(
             // rotated runway line points
-            x: self.as_line(origin)[0].x,
-            y: self.as_line(origin)[0].y,
-        };
+            self.as_line(origin)[0].x,
+            self.as_line(origin)[0].y,
+        );
         // note, state not automatically updated
         ILS {
             origin,
@@ -385,7 +373,7 @@ impl Runway {
     }
 
     // TODO
-    pub fn has_landed(&self, origin: Point, aircraft: &Aircraft) -> bool {
+    pub fn has_landed(&self, origin: glm::Vec2, aircraft: &Aircraft) -> bool {
         is_point_in_circle(aircraft.position, origin, 500.0)
     }
 
@@ -393,7 +381,7 @@ impl Runway {
     pub fn as_mesh(
         &self,
         ctx: &mut Context,
-        origin: Point,
+        origin: glm::Vec2,
         color: Color,
         camera: &Camera,
     ) -> GameResult<graphics::Mesh> {
@@ -415,17 +403,14 @@ impl Runway {
 
 #[derive(Clone, Debug)]
 pub struct Airport {
-    pub position: Point,
+    pub position: glm::Vec2,
     pub icao_code: String,
     pub takeoff_runways: Vec<Runway>,
     pub landing_runways: Vec<Runway>,
 }
 
 impl Airport {
-    pub fn origin(&self, runway: &Runway) -> Point {
-        Point {
-            x: self.position.x + runway.offset.x,
-            y: self.position.y + runway.offset.y,
-        }
+    pub fn origin(&self, runway: &Runway) -> glm::Vec2 {
+        self.position + runway.offset
     }
 }

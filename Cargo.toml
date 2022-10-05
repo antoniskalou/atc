@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 lazy_static = "^1.4.0"
+nalgebra-glm = "^0.17"
 mint = "^0.5.6"
-ggez = "^0.6.1"
+ggez = "^0.7.0"
 
 # WSG84
 geographiclib-rs = "^0.2.1"
