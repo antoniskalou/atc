@@ -35,7 +35,6 @@ impl Into<ggez::mint::Point2<f32>> for MintPoint {
 }
 
 pub fn point_distance(p1: glm::Vec2, p2: glm::Vec2) -> f32 {
-    // ((p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2)).sqrt()
     glm::distance(&p1, &p2)
 }
 
@@ -47,7 +46,7 @@ pub fn sign(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2) -> f32 {
     (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
 }
 
-pub fn is_point_in_triangle(point: glm::Vec2, triangle: Vec<glm::Vec2>) -> bool {
+pub fn is_point_in_triangle(point: glm::Vec2, triangle: &[glm::Vec2]) -> bool {
     let d1 = sign(point, triangle[0], triangle[1]);
     let d2 = sign(point, triangle[1], triangle[2]);
     let d3 = sign(point, triangle[2], triangle[0]);
@@ -60,7 +59,7 @@ pub fn is_point_in_triangle(point: glm::Vec2, triangle: Vec<glm::Vec2>) -> bool 
 
 /// Rotate a point by an angle (in radians) around an origin (clockwise)
 pub fn rotate_point(origin: glm::Vec2, point: glm::Vec2, angle: f32) -> glm::Vec2 {
-    let cos = angle.cos();
+    let cos = angle.cos(); 
     let sin = angle.sin();
 
     glm::Vec2::new(
@@ -113,6 +112,37 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_point_distance() {
+        assert_eq!(0., point_distance(glm::vec2(1., 1.), glm::vec2(1., 1.)));
+        assert_eq!(1., point_distance(glm::vec2(0., 1.), glm::vec2(1., 1.)));
+        assert_eq!(1., point_distance(glm::vec2(1., 0.), glm::vec2(1., 1.)));
+    }
+
+    #[test]
+    fn test_is_point_in_circle() {
+        assert!(is_point_in_circle(glm::zero(), glm::zero(), 1.));
+        assert!(is_point_in_circle(glm::vec2(0.5, 0.5), glm::zero(), 1.));
+        assert!(!is_point_in_circle(glm::vec2(2., 0.), glm::zero(), 1.));
+        assert!(!is_point_in_circle(glm::vec2(0., 2.), glm::zero(), 1.));
+        assert!(!is_point_in_circle(glm::vec2(2., 2.), glm::zero(), 1.));
+    }
+
+    #[test]
+    fn test_is_point_in_triangle() {
+        assert!(is_point_in_triangle(glm::zero(), &[
+            glm::vec2(-1., -1.),
+            glm::vec2(1., 1.),
+            glm::vec2(-1., 1.)
+        ]));
+
+        assert!(!is_point_in_triangle(glm::vec2(2., 2.), &[
+            glm::vec2(-1., -1.),
+            glm::vec2(1., 1.),
+            glm::vec2(-1., 1.)
+        ]));
+    }
+
+    #[test]
     fn test_heading_to_point() {
         assert_eq!((0.0, 1.0), (heading_to_point(0).x, heading_to_point(0).y));
         assert_eq!(
@@ -149,5 +179,23 @@ mod test {
         assert_eq!(135, point_to_heading(glm::vec2(1., -1.)));
         assert_eq!(225, point_to_heading(glm::vec2(-1., -1.)));
         assert_eq!(315, point_to_heading(glm::vec2(-1., 1.)));
+    }
+
+    #[test]
+    fn test_distance_line_and_point() {
+        assert_eq!(0., distance_line_and_point(&[
+            glm::zero(),
+            glm::vec2(0., 1.)
+        ], glm::zero()));
+
+        assert_eq!(1., distance_line_and_point(&[
+            glm::zero(),
+            glm::vec2(0., 1.)
+        ], glm::vec2(1., 0.)));
+
+        assert_eq!(1., distance_line_and_point(&[
+            glm::zero(),
+            glm::vec2(1., 0.)
+        ], glm::vec2(0., 1.)));
     }
 }

@@ -238,7 +238,7 @@ impl Aircraft {
     }
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {
-        is_point_in_triangle(self.position, localizer.as_triangle())
+        is_point_in_triangle(self.position, &localizer.as_triangle())
             && self.altitude.current as u32 <= localizer.altitude(self.position)
     }
 
