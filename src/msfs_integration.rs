@@ -62,7 +62,6 @@ pub fn start_msfs_monitor(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) 
             SimConnectRecv::AssignedObjectId(obj) => {
                 let request_id = obj.dwRequestID;
                 let object_id = obj.dwObjectID;
-                println!("Received rid: {}, oid: {}", request_id, object_id);
                 oid_tx.send((request_id, object_id)).unwrap();
             }
             _ => println!("SimConnect: {:?}", recv),
@@ -82,6 +81,7 @@ pub fn start_msfs_monitor(origin: LatLon, aircraft: Arc<RwLock<Vec<Aircraft>>>) 
             );
 
             if let Ok((rid, oid)) = oid_rx.try_recv() {
+                println!("Received rid: {}, oid: {}", rid, oid);
                 if let Some(aircraft) = requests.get(&rid) {
                     sim.ai_release_control(oid, GEN_REQUEST_ID.unique())
                         .unwrap();

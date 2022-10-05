@@ -320,6 +320,13 @@ impl ILS {
         )
     }
 
+    pub fn as_line(&self) -> Vec<glm::Vec2> {
+        rotate_points(self.origin, &[
+            self.origin,
+            self.origin + glm::vec2(0., ILS_LENGTH)
+        ], invert_bearing(self.runway.heading as f32).to_radians())
+    }
+
     pub fn distance(&self, position: glm::Vec2) -> f32 {
         point_distance(position, self.origin)
     }

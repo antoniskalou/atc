@@ -205,9 +205,13 @@ impl EventHandler<ggez::GameError> for Game {
                     let origin = self.airport.origin(runway);
                     let ils = runway.ils(origin);
 
+                    let xtk = distance_line_and_point(&ils.as_line(), aircraft.position);
+                    println!("ILS xtk: {}", xtk);
+
                     if runway.has_landed(origin, aircraft) {
                         aircraft.status = AircraftStatus::Landed;
                     } else if aircraft.is_localizer_captured(&ils) {
+
                         aircraft.status = AircraftStatus::Landing;
                         aircraft.change_heading(runway.heading as i32, None);
 
@@ -349,6 +353,12 @@ impl EventHandler<ggez::GameError> for Game {
                 &ils,
                 Color::BLUE,
             )?;
+            graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
+
+            let ils_line = runway.ils(origin).as_line().iter()
+                .map(|p| self.camera.world_to_screen_coords(p.clone()))
+                .collect::<Vec<Point>>();
+            let mesh = graphics::Mesh::new_line(ctx, &ils_line, 2., Color::MAGENTA)?;
             graphics::draw(ctx, &mesh, (Point { x: 0.0, y: 0.0 },))?;
         }
 

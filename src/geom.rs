@@ -94,17 +94,15 @@ pub fn point_to_heading(p: glm::Vec2) -> i32 {
 }
 
 /// https://stackoverflow.com/a/1501725
-pub fn distance_line_and_point(line: &[glm::Vec2; 2], p: glm::Vec2) -> f32 {
-    let [v, w] = *line;
-    let length = glm::distance(&v, &w);
+pub fn distance_line_and_point(line: &[glm::Vec2], p: glm::Vec2) -> f32 {
+    let v = line[0];
+    let w = line[1];
 
-    if length == 0. {
-        length
-    } else {
-        let t = clamp(glm::dot(&(p - v), &(w - v)) / length, 0., 1.);
-        let projection = v + t * (w - v);
-        glm::distance(&p, &projection)
-    }
+    let a = v.y - w.y;
+    let b = w.x - v.x;
+    let c = v.x * w.y - w.x * v.y;
+
+    (a * p.x + b * p.y + c).abs() / (a * a + b * b).sqrt()
 }
 
 #[cfg(test)]
