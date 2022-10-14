@@ -14,7 +14,8 @@ use std::{
     thread::JoinHandle,
 };
 
-const UPDATE_FREQUENCY_MS: u64 = 100;
+// 30FPS
+const UPDATE_FREQUENCY_MS: u64 = 1000 / 30;
 
 // TODO: make private
 #[data_definition]

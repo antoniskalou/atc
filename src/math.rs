@@ -1,8 +1,13 @@
 // TODO: convert all to use num crate
 
-pub fn round_decimal(val: f64, decimal_points: u8) -> f64 {
+pub fn round_decimal(val: f64, decimal_points: u32) -> f64 {
     let multiplier = 10f64.powi(decimal_points as i32);
     (val * multiplier).round() / multiplier
+}
+
+pub fn round_to_sf(val: f64, sf: u32) -> f64 {
+    let multiplier = 10f64.powi(sf as i32);
+    (val / multiplier).round() * multiplier
 }
 
 #[test]
@@ -28,6 +33,19 @@ where
     }
 }
 
+/// Opposite of clamp, returns a value outside of the range.
+pub fn spread(val: f32, min: f32, max: f32) -> f32 {
+    let avg = (min + max) / 2.;
+
+    if val <= min || val >= max {
+        val
+    } else if val < avg {
+        min
+    } else {
+        max
+    }
+}
+
 /// Returns the sign of the value. -1 or 1, or 0 if value is zero
 pub fn sign(s: f32) -> f32 {
     if s < 0.0 {
@@ -46,6 +64,10 @@ pub fn invert_bearing(angle: f32) -> f32 {
     } else {
         angle + 180.0
     }
+}
+
+pub fn degrees_normalize(angle: f32) -> f32 {
+    angle.rem_euclid(360.)
 }
 
 /// Returns the complement of the angle, in degrees.
@@ -130,6 +152,12 @@ mod test {
         assert_eq!(-1.0, sign(-6.0));
         assert_eq!(1.0, sign(10.0));
         assert_eq!(0.0, sign(0.0));
+    }
+    
+    #[test]
+    fn test_degrees_normalize() {
+        assert_eq!(10., degrees_normalize(370.));
+        assert_eq!(350., degrees_normalize(-10.));
     }
 
     #[test]

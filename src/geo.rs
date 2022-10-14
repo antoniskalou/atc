@@ -135,7 +135,7 @@ impl LatLon {
     pub fn from_game_world(origin: LatLon, offset: glm::Vec2) -> Self {
         let bearing = point_to_heading(offset);
         // 1 world unit = 1m
-        let distance = point_distance(glm::zero(), offset);
+        let distance = point_distance(&glm::zero(), &offset);
         origin.destination(bearing as f64, distance as f64)
     }
 

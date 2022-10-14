@@ -78,14 +78,15 @@ impl Game {
                 cleared_to_land: false,
             },
             Aircraft {
-                position: glm::vec2(2000.0, 3000.0),
+                position: glm::vec2(14000.0, -2000.0),
                 callsign: Callsign {
                     name: "Fedex".into(),
                     code: "FDX".into(),
                     number: "261".into(),
                 },
-                heading: HeadingParameter::new(15.0),
-                altitude: AircraftParameter::new(2000.0),
+
+                heading: HeadingParameter::new(245.0),
+                altitude: AircraftParameter::new(1000.0),
                 speed: AircraftParameter::new(180.0),
                 status: AircraftStatus::Flight,
                 cleared_to_land: false,
@@ -205,17 +206,17 @@ impl EventHandler<ggez::GameError> for Game {
                     let origin = self.airport.origin(runway);
                     let ils = runway.ils(origin);
 
-                    let xtk = distance_line_and_point(&ils.as_line(), aircraft.position);
-                    println!("ILS xtk: {}", xtk);
-
                     if runway.has_landed(origin, aircraft) {
                         aircraft.status = AircraftStatus::Landed;
                     } else if aircraft.is_localizer_captured(&ils) {
-
                         aircraft.status = AircraftStatus::Landing;
-                        aircraft.change_heading(runway.heading as i32, None);
+                    }
 
-                        let expected_alt = ils.altitude(aircraft.position);
+                    // TEMPORARY, fix loc capture logic
+                    if aircraft.status == AircraftStatus::Landing {
+                        aircraft.change_heading(ils.intercept_heading(aircraft), None);
+
+                        let expected_alt = ils.altitude(&aircraft.position);
                         aircraft.change_altitude(expected_alt);
                     }
                 }

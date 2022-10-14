@@ -195,6 +195,8 @@ impl AircraftParameter {
     }
 }
 
+const TURN_RATE: f32 = 0.1;
+
 #[derive(Clone, Debug)]
 pub struct Aircraft {
     pub position: glm::Vec2,
@@ -211,11 +213,11 @@ pub struct Aircraft {
 }
 
 impl Aircraft {
-    pub fn change_heading(&mut self, course: i32, direction: Option<TurnDirection>) {
-        // time for 1 degree change
-        let duration = 0.1;
+    pub fn change_heading(&mut self, course: f32, direction: Option<TurnDirection>) {
+        // time in seconds for 1 degree change
+        let duration = TURN_RATE;
         // FIXME: don't use clamp, use rem_euclid (maybe)
-        let course = clamp(course, 0, 360) as f32;
+        let course = clamp(course, 0., 360.);
 
         match direction {
             Some(direction) => self.heading.change_with_turn(course, duration, direction),
@@ -239,7 +241,7 @@ impl Aircraft {
 
     pub fn is_localizer_captured(&self, localizer: &ILS) -> bool {
         is_point_in_triangle(self.position, &localizer.as_triangle())
-            && self.altitude.current as u32 <= localizer.altitude(self.position)
+            && self.altitude.current as u32 <= localizer.altitude(&self.position)
     }
 
     pub fn is_grounded(&self) -> bool {
@@ -254,12 +256,12 @@ impl Aircraft {
         use AtcCommand::*;
         match cmd.0 {
             ChangeHeading(heading) => {
-                self.change_heading(heading, None)
+                self.change_heading(heading as f32, None)
                 // reply
                 // TODO
             }
             ChangeHeadingWithTurnDirection(heading, direction) => {
-                self.change_heading(heading, Some(direction))
+                self.change_heading(heading as f32, Some(direction))
             }
             ChangeAltitude(altitude) => self.change_altitude(altitude),
             ChangeSpeed(speed) => self.change_speed(speed),
@@ -285,6 +287,8 @@ pub fn aircraft_by_callsign(
     idx.map(|i| (i, &aircraft[i]))
 }
 
+pub const ONE_SECOND_IN_HOURS: f32 = 1. / 3600.;
+
 // 8nm
 pub const ILS_LENGTH: f32 = 8. * units::NM_to_KM as f32 * 1000.;
 
@@ -296,6 +300,10 @@ pub struct ILS {
 }
 
 impl ILS {
+    pub fn heading(&self) -> f32 {
+        invert_bearing(self.runway.heading as f32)
+    }
+
     pub fn as_triangle(&self) -> Vec<glm::Vec2> {
         let localizer = [
             self.origin,
@@ -316,7 +324,7 @@ impl ILS {
             self.origin,
             &localizer,
             // ILS bearing is opposite of runway
-            invert_bearing(self.runway.heading as f32).to_radians(),
+            self.heading().to_radians(),
         )
     }
 
@@ -324,19 +332,54 @@ impl ILS {
         rotate_points(self.origin, &[
             self.origin,
             self.origin + glm::vec2(0., ILS_LENGTH)
-        ], invert_bearing(self.runway.heading as f32).to_radians())
+        ], self.heading().to_radians())
     }
 
-    pub fn distance(&self, position: glm::Vec2) -> f32 {
-        point_distance(position, self.origin)
+    pub fn crosstrack_distance(&self, position: &glm::Vec2) -> f32 {
+        distance_line_and_point(&self.as_line(), position)
     }
 
-    pub fn altitude(&self, position: glm::Vec2) -> u32 {
+    pub fn crosstrack_angle(&self, position: &glm::Vec2) -> f32 {
+        point_angle(&self.origin, position).to_degrees()
+    }
+
+    pub fn distance(&self, position: &glm::Vec2) -> f32 {
+        point_distance(position, &self.origin)
+    }
+
+    pub fn altitude(&self, position: &glm::Vec2) -> u32 {
         let distance = self.distance(position);
         let expected_alt = self.runway.ils_max_altitude as f32 * (distance / ILS_LENGTH);
         // round to 1000
-        let rounded_alt = (expected_alt / 1000.0).round() * 1000.0;
+        let rounded_alt = round_to_sf(expected_alt as f64, 3);
         rounded_alt as u32
+    }
+
+    pub fn intercept_heading(&self, aircraft: &Aircraft) -> f32 {
+        // https://github.com/openscope/openscope/blob/2860a23834ec11311cea47bac199031d0844955b/src/assets/scripts/client/aircraft/AircraftModel.js#L1868
+        let course = self.runway.heading as f32;
+        let heading = aircraft.heading.current;
+        let xtk_angle = self.crosstrack_angle(&aircraft.position);
+        let bearing_to_runway = heading + xtk_angle;
+        let angle_away_from_loc = course - bearing_to_runway;
+
+        let minimum_intercept_angle = 10.;
+        let intercept_angle = spread(
+            angle_away_from_loc, // * -severity_of_correction,
+            -minimum_intercept_angle,
+            minimum_intercept_angle
+        );
+        let intercept_heading = course + intercept_angle;
+        println!("course: {}, heading: {}, xtk angle: {},  bearing to rwy: {}, angle from loc: {}, intercept angle: {}, intercept heading: {}", 
+            course, heading, xtk_angle, bearing_to_runway, angle_away_from_loc, intercept_angle, intercept_heading);
+
+        if heading < course {
+            intercept_heading.max(heading)
+        } else if heading > course {
+            intercept_heading.min(heading)
+        } else {
+            intercept_heading
+        }
     }
 }
 

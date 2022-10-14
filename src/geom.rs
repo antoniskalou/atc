@@ -34,8 +34,13 @@ impl Into<ggez::mint::Point2<f32>> for MintPoint {
     }
 }
 
-pub fn point_distance(p1: glm::Vec2, p2: glm::Vec2) -> f32 {
+pub fn point_distance(p1: &glm::Vec2, p2: &glm::Vec2) -> f32 {
     glm::distance(&p1, &p2)
+}
+
+// Angle between 2 points, in radians
+pub fn point_angle(p1: &glm::Vec2, p2: &glm::Vec2) -> f32 {
+    glm::angle(&p1, &p2)
 }
 
 pub fn is_point_in_circle(point: glm::Vec2, circle_pos: glm::Vec2, circle_radius: f32) -> bool {
@@ -94,7 +99,7 @@ pub fn point_to_heading(p: glm::Vec2) -> i32 {
 }
 
 /// https://stackoverflow.com/a/1501725
-pub fn distance_line_and_point(line: &[glm::Vec2], p: glm::Vec2) -> f32 {
+pub fn distance_line_and_point(line: &[glm::Vec2], p: &glm::Vec2) -> f32 {
     let v = line[0];
     let w = line[1];
 
@@ -111,9 +116,9 @@ mod test {
 
     #[test]
     fn test_point_distance() {
-        assert_eq!(0., point_distance(glm::vec2(1., 1.), glm::vec2(1., 1.)));
-        assert_eq!(1., point_distance(glm::vec2(0., 1.), glm::vec2(1., 1.)));
-        assert_eq!(1., point_distance(glm::vec2(1., 0.), glm::vec2(1., 1.)));
+        assert_eq!(0., point_distance(&glm::vec2(1., 1.), &glm::vec2(1., 1.)));
+        assert_eq!(1., point_distance(&glm::vec2(0., 1.), &glm::vec2(1., 1.)));
+        assert_eq!(1., point_distance(&glm::vec2(1., 0.), &glm::vec2(1., 1.)));
     }
 
     #[test]
@@ -184,16 +189,16 @@ mod test {
         assert_eq!(0., distance_line_and_point(&[
             glm::zero(),
             glm::vec2(0., 1.)
-        ], glm::zero()));
+        ], &glm::zero()));
 
         assert_eq!(1., distance_line_and_point(&[
             glm::zero(),
             glm::vec2(0., 1.)
-        ], glm::vec2(1., 0.)));
+        ], &glm::vec2(1., 0.)));
 
         assert_eq!(1., distance_line_and_point(&[
             glm::zero(),
             glm::vec2(1., 0.)
-        ], glm::vec2(0., 1.)));
+        ], &glm::vec2(0., 1.)));
     }
 }
