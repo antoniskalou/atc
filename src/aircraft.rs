@@ -370,9 +370,6 @@ impl ILS {
             minimum_intercept_angle
         );
         let intercept_heading = course + intercept_angle;
-        println!("course: {}, heading: {}, xtk angle: {},  bearing to rwy: {}, angle from loc: {}, intercept angle: {}, intercept heading: {}", 
-            course, heading, xtk_angle, bearing_to_runway, angle_away_from_loc, intercept_angle, intercept_heading);
-
         if heading < course {
             intercept_heading.max(heading)
         } else if heading > course {
